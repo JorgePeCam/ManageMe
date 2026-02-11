@@ -12,7 +12,7 @@ struct SettingsView: View {
                         HStack(spacing: 10) {
                             Image(systemName: "brain.head.profile")
                                 .font(.title3)
-                                .foregroundStyle(.accent)
+                                .foregroundStyle(Color.appAccent)
 
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Proveedor de IA")
@@ -27,7 +27,7 @@ struct SettingsView: View {
 
                     HStack {
                         Image(systemName: "key.fill")
-                            .foregroundStyle(.accent)
+                            .foregroundStyle(Color.appAccent)
                             .frame(width: 24)
 
                         SecureField("API Key de OpenAI", text: $viewModel.apiKey)
@@ -43,12 +43,12 @@ struct SettingsView: View {
                         Label("Necesitas una API key para respuestas inteligentes",
                               systemImage: "exclamationmark.triangle.fill")
                             .font(.caption)
-                            .foregroundStyle(.warning)
+                            .foregroundStyle(Color.appWarning)
                     } else {
                         Label("API key configurada",
                               systemImage: "checkmark.circle.fill")
                             .font(.caption)
-                            .foregroundStyle(.success)
+                            .foregroundStyle(Color.appSuccess)
                     }
                 } header: {
                     Text("Inteligencia Artificial")
@@ -92,7 +92,7 @@ struct SettingsView: View {
                         viewModel.reindexAll()
                     } label: {
                         Label("Reindexar documentos", systemImage: "arrow.clockwise")
-                            .foregroundStyle(.accent)
+                            .foregroundStyle(Color.appAccent)
                     }
 
                     Button(role: .destructive) {
@@ -120,7 +120,7 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Ajustes")
-            .tint(.accent)
+            .tint(Color.appAccent)
             .alert("Borrar todos los datos", isPresented: $viewModel.showDeleteConfirmation) {
                 Button("Cancelar", role: .cancel) {}
                 Button("Borrar todo", role: .destructive) {

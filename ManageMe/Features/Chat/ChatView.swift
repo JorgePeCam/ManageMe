@@ -25,7 +25,7 @@ struct ChatView: View {
                             viewModel.clearMessages()
                         } label: {
                             Image(systemName: "arrow.counterclockwise")
-                                .foregroundStyle(.appAccent)
+                                .foregroundStyle(Color.appAccent)
                         }
                     }
                 }
@@ -46,7 +46,7 @@ struct ChatView: View {
 
                 Image(systemName: "sparkles")
                     .font(.system(size: 40, weight: .light))
-                    .foregroundStyle(.appAccent)
+                    .foregroundStyle(Color.appAccent)
             }
 
             VStack(spacing: 8) {
@@ -79,7 +79,7 @@ struct ChatView: View {
             HStack(spacing: 12) {
                 Image(systemName: icon)
                     .font(.body)
-                    .foregroundStyle(.appAccent)
+                    .foregroundStyle(Color.appAccent)
                     .frame(width: 28)
 
                 Text(text)
@@ -95,7 +95,7 @@ struct ChatView: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
-            .background(.appCard)
+            .background(Color.appCard)
             .clipShape(RoundedRectangle(cornerRadius: AppStyle.cornerRadiusSmall))
             .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
         }
@@ -177,7 +177,7 @@ struct ChatView: View {
         }
         .padding(.horizontal, AppStyle.padding)
         .padding(.vertical, 10)
-        .background(.appCard)
+        .background(Color.appCard)
     }
 }
 
@@ -202,7 +202,7 @@ struct MessageBubble: View {
                     Text(message.content)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 12)
-                        .background(.appCard)
+                        .background(Color.appCard)
                         .foregroundStyle(.primary)
                         .clipShape(RoundedRectangle(cornerRadius: 18))
                         .shadow(color: .black.opacity(0.04), radius: 3, y: 1)
@@ -227,11 +227,12 @@ struct MessageBubble: View {
                 .textCase(.uppercase)
                 .tracking(0.5)
 
+            // Use Identifiable overload to avoid Binding inference issues
             ForEach(message.citations) { citation in
                 HStack(spacing: 8) {
                     Image(systemName: "doc.text.fill")
                         .font(.caption2)
-                        .foregroundStyle(.appAccent)
+                        .foregroundStyle(Color.appAccent)
 
                     Text(citation.documentTitle)
                         .font(.caption)
@@ -243,7 +244,7 @@ struct MessageBubble: View {
                     Text("\(Int(citation.score * 100))%")
                         .font(.caption2)
                         .fontWeight(.medium)
-                        .foregroundStyle(.appAccent)
+                        .foregroundStyle(Color.appAccent)
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)

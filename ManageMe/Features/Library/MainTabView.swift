@@ -18,6 +18,6 @@ struct MainTabView: View {
                     Label("Ajustes", systemImage: "gearshape.fill")
                 }
         }
-        .tint(.appAccent)
+        .tint(Color.appAccent)
     }
 }

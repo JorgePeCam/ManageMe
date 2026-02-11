@@ -18,7 +18,7 @@ struct DocumentCard: View {
 
                     Image(systemName: document.fileTypeEnum.systemImage)
                         .font(.system(size: 28, weight: .light))
-                        .foregroundStyle(.appAccent.opacity(0.7))
+                        .foregroundStyle(Color.appAccent.opacity(0.7))
                 }
             }
             .frame(height: 110)
@@ -51,7 +51,7 @@ struct DocumentCard: View {
             .padding(.horizontal, AppStyle.paddingSmall + 2)
             .padding(.vertical, AppStyle.paddingSmall)
         }
-        .background(.appCard)
+        .background(Color.appCard)
         .clipShape(RoundedRectangle(cornerRadius: AppStyle.cornerRadius))
         .shadow(
             color: .black.opacity(AppStyle.shadowOpacity),
@@ -65,16 +65,16 @@ struct DocumentCard: View {
         switch document.processingStatusEnum {
         case .ready:
             Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(.appSuccess)
+                .foregroundStyle(Color.appSuccess)
                 .font(.caption)
         case .error:
             Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.appDanger)
+                .foregroundStyle(Color.appDanger)
                 .font(.caption)
         case .pending, .extracting, .chunking, .embedding:
             ProgressView()
                 .scaleEffect(0.7)
-                .tint(.appAccent)
+                .tint(Color.appAccent)
         }
     }
 }

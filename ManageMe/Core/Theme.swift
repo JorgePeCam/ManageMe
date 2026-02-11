@@ -85,13 +85,13 @@ struct AccentCardStyle: ViewModifier {
             .clipShape(RoundedRectangle(cornerRadius: AppStyle.cornerRadius))
             .overlay(
                 RoundedRectangle(cornerRadius: AppStyle.cornerRadius)
-                    .stroke(Color.accent.opacity(0.15), lineWidth: 1)
+                    .stroke(Color.appAccent.opacity(0.15), lineWidth: 1)
             )
     }
 }
 
 struct PillBadge: ViewModifier {
-    var color: Color = .accent
+    var color: Color = .appAccent
 
     func body(content: Content) -> some View {
         content
@@ -114,7 +114,7 @@ extension View {
         modifier(AccentCardStyle())
     }
 
-    func pillBadge(color: Color = .accent) -> some View {
+    func pillBadge(color: Color = .appAccent) -> some View {
         modifier(PillBadge(color: color))
     }
 }
@@ -128,7 +128,7 @@ struct TypingIndicator: View {
         HStack(spacing: 4) {
             ForEach(0..<3) { index in
                 Circle()
-                    .fill(Color.accent.opacity(0.6))
+                    .fill(Color.appAccent.opacity(0.6))
                     .frame(width: 7, height: 7)
                     .scaleEffect(animating ? 1.0 : 0.5)
                     .opacity(animating ? 1.0 : 0.3)

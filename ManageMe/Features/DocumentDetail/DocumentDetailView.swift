@@ -23,11 +23,11 @@ struct DocumentDetailView: View {
                 .padding(AppStyle.padding)
             } else {
                 ProgressView()
-                    .tint(.accent)
+                    .tint(Color.appAccent)
                     .padding(.top, 100)
             }
         }
-        .background(Color.cardBackgroundSecondary)
+        .background(Color.appCardSecondary)
         .navigationTitle(viewModel.document?.title ?? "Documento")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -37,7 +37,7 @@ struct DocumentDetailView: View {
                         viewModel.reprocess()
                     } label: {
                         Label("Reintentar", systemImage: "arrow.clockwise")
-                            .foregroundStyle(.accent)
+                            .foregroundStyle(Color.appAccent)
                     }
                 }
             }
@@ -60,7 +60,7 @@ struct DocumentDetailView: View {
 
                 Image(systemName: document.fileTypeEnum.systemImage)
                     .font(.system(size: 26, weight: .light))
-                    .foregroundStyle(.accent)
+                    .foregroundStyle(Color.appAccent)
             }
 
             VStack(alignment: .leading, spacing: 4) {
@@ -114,7 +114,7 @@ struct DocumentDetailView: View {
 
             if document.processingStatusEnum != .ready && document.processingStatusEnum != .error {
                 ProgressView()
-                    .tint(.accent)
+                    .tint(Color.appAccent)
             }
         }
         .cardStyle()
@@ -123,12 +123,12 @@ struct DocumentDetailView: View {
     @ViewBuilder
     private func statusIcon(_ document: Document) -> some View {
         let (icon, color): (String, Color) = switch document.processingStatusEnum {
-        case .ready: ("checkmark.circle.fill", .success)
-        case .error: ("exclamationmark.triangle.fill", .danger)
-        case .pending: ("clock.fill", .warning)
-        case .extracting: ("doc.text.magnifyingglass", .accent)
-        case .chunking: ("scissors", .accent)
-        case .embedding: ("brain", .accent)
+        case .ready: ("checkmark.circle.fill", .appSuccess)
+        case .error: ("exclamationmark.triangle.fill", .appDanger)
+        case .pending: ("clock.fill", .appWarning)
+        case .extracting: ("doc.text.magnifyingglass", .appAccent)
+        case .chunking: ("scissors", .appAccent)
+        case .embedding: ("brain", .appAccent)
         }
 
         Image(systemName: icon)
@@ -156,17 +156,17 @@ struct DocumentDetailView: View {
         } label: {
             HStack {
                 Image(systemName: "eye.fill")
-                    .foregroundStyle(.accent)
+                    .foregroundStyle(Color.appAccent)
                 Text("Ver archivo original")
                     .fontWeight(.medium)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
-            .background(.cardBackground)
+            .background(Color.appCard)
             .clipShape(RoundedRectangle(cornerRadius: AppStyle.cornerRadius))
             .overlay(
                 RoundedRectangle(cornerRadius: AppStyle.cornerRadius)
-                    .stroke(Color.accent.opacity(0.2), lineWidth: 1)
+                    .stroke(Color.appAccent.opacity(0.2), lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
@@ -178,7 +178,7 @@ struct DocumentDetailView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Image(systemName: "text.alignleft")
-                    .foregroundStyle(.accent)
+                    .foregroundStyle(Color.appAccent)
                 Text("Texto extraido")
                     .fontWeight(.semibold)
             }

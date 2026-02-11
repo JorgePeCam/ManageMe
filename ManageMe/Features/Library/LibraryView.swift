@@ -38,7 +38,7 @@ struct LibraryView: View {
                         Image(systemName: "plus.circle.fill")
                             .font(.title3)
                             .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(.appAccent)
+                            .foregroundStyle(Color.appAccent)
                     }
                 }
 
@@ -62,7 +62,7 @@ struct LibraryView: View {
                               ? "line.3.horizontal.decrease.circle.fill"
                               : "line.3.horizontal.decrease.circle")
                             .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(.appAccent)
+                            .foregroundStyle(Color.appAccent)
                     }
                 }
             }
@@ -97,7 +97,7 @@ struct LibraryView: View {
 
                 Image(systemName: "doc.text.magnifyingglass")
                     .font(.system(size: 48, weight: .light))
-                    .foregroundStyle(.appAccent)
+                    .foregroundStyle(Color.appAccent)
             }
 
             VStack(spacing: 8) {
@@ -120,7 +120,7 @@ struct LibraryView: View {
                         .frame(maxWidth: 220)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.appAccent)
+                .tint(Color.appAccent)
                 .controlSize(.large)
 
                 Button {
@@ -130,7 +130,7 @@ struct LibraryView: View {
                         .frame(maxWidth: 220)
                 }
                 .buttonStyle(.bordered)
-                .tint(.appAccent)
+                .tint(Color.appAccent)
                 .controlSize(.large)
             }
 
