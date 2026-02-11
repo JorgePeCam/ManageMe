@@ -85,7 +85,7 @@ struct ChunkRepository {
 
     func searchByKeywords(query: String, limit: Int = 5) async throws -> [SearchResult] {
         // Sanitize query for FTS5: remove special characters, keep only words
-        let sanitized = sanitizeFTSQuery(query)
+        let sanitized = Self.sanitizeFTSQuery(query)
         guard !sanitized.isEmpty else { return [] }
 
         return try await db.dbWriter.read { db in
@@ -115,7 +115,7 @@ struct ChunkRepository {
 
     /// Converts user text into a valid FTS5 query.
     /// Removes punctuation and joins words with OR for broader matching.
-    private func sanitizeFTSQuery(_ query: String) -> String {
+    static func sanitizeFTSQuery(_ query: String) -> String {
         let words = query
             .components(separatedBy: CharacterSet.alphanumerics.inverted)
             .map { $0.trimmingCharacters(in: .whitespaces) }

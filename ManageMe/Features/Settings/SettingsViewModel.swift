@@ -7,6 +7,7 @@ final class SettingsViewModel: ObservableObject {
     @Published var storageUsed = "Calculando..."
     @Published var showDeleteConfirmation = false
     @Published var apiKey: String = ""
+    @Published var userErrorMessage: String?
 
     private let repository = DocumentRepository()
 
@@ -35,17 +36,23 @@ final class SettingsViewModel: ObservableObject {
             let totalBytes = docs.compactMap(\.fileSizeBytes).reduce(0, +)
             storageUsed = ByteCountFormatter.string(fromByteCount: totalBytes, countStyle: .file)
         } catch {
-            print("Error cargando estadisticas: \(error)")
+            AppLogger.error("Error cargando estadisticas: \(error.localizedDescription)")
+            userErrorMessage = "No se pudieron cargar las estadísticas."
         }
     }
 
     func reindexAll() {
         Task {
-            let docs = try? await repository.fetchAll()
-            for doc in docs ?? [] {
-                await DocumentProcessor.shared.reprocess(documentId: doc.id)
+            do {
+                let docs = try await repository.fetchAll()
+                for doc in docs {
+                    await DocumentProcessor.shared.reprocess(documentId: doc.id)
+                }
+                await loadStats()
+            } catch {
+                AppLogger.error("Error reindexando documentos: \(error.localizedDescription)")
+                userErrorMessage = "No se pudieron reindexar los documentos."
             }
-            await loadStats()
         }
     }
 
@@ -60,7 +67,8 @@ final class SettingsViewModel: ObservableObject {
                 documentCount = 0
                 storageUsed = "0 bytes"
             } catch {
-                print("Error borrando datos: \(error)")
+                AppLogger.error("Error borrando datos: \(error.localizedDescription)")
+                userErrorMessage = "No se pudieron borrar todos los datos."
             }
         }
     }

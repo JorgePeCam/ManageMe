@@ -132,6 +132,18 @@ struct SettingsView: View {
             .task {
                 await viewModel.loadStats()
             }
+            .alert("Error", isPresented: Binding(
+                get: { viewModel.userErrorMessage != nil },
+                set: { isPresented in
+                    if !isPresented { viewModel.userErrorMessage = nil }
+                }
+            )) {
+                Button("OK", role: .cancel) {
+                    viewModel.userErrorMessage = nil
+                }
+            } message: {
+                Text(viewModel.userErrorMessage ?? "Ha ocurrido un error.")
+            }
         }
     }
 }

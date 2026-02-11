@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 extension Array where Element == Float {
     func toData() -> Data {
@@ -11,5 +12,18 @@ extension Data {
         withUnsafeBytes { buffer in
             Array(buffer.bindMemory(to: Float.self))
         }
+    }
+}
+
+
+enum AppLogger {
+    private static let logger = Logger(subsystem: "com.manageme.app", category: "ManageMe")
+
+    static func info(_ message: String) {
+        logger.info("\(message, privacy: .public)")
+    }
+
+    static func error(_ message: String) {
+        logger.error("\(message, privacy: .public)")
     }
 }
