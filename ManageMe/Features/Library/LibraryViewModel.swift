@@ -9,6 +9,7 @@ final class LibraryViewModel: ObservableObject {
     @Published var showImporter = false
     @Published var showCamera = false
     @Published var filterType: FileType?
+    @Published var userErrorMessage: String?
 
     private let repository = DocumentRepository()
 
@@ -27,7 +28,8 @@ final class LibraryViewModel: ObservableObject {
         do {
             documents = try await repository.fetchAll()
         } catch {
-            print("Error cargando documentos: \(error)")
+            AppLogger.error("Error cargando documentos: \(error.localizedDescription)")
+            userErrorMessage = "No se pudieron cargar los documentos."
         }
     }
 
@@ -38,7 +40,8 @@ final class LibraryViewModel: ObservableObject {
                 Task { await importFile(from: url) }
             }
         case .failure(let error):
-            print("Error importando: \(error)")
+            AppLogger.error("Error importando: \(error.localizedDescription)")
+            userErrorMessage = "No se pudo importar el archivo seleccionado."
         }
     }
 
@@ -57,7 +60,8 @@ final class LibraryViewModel: ObservableObject {
                 try await repository.delete(id: id)
                 documents.removeAll { $0.id == id }
             } catch {
-                print("Error eliminando: \(error)")
+                AppLogger.error("Error eliminando: \(error.localizedDescription)")
+                userErrorMessage = "No se pudo eliminar el documento."
             }
         }
     }
@@ -89,12 +93,13 @@ final class LibraryViewModel: ObservableObject {
             documents.insert(document, at: 0)
 
             // Process in background
-            Task.detached {
+            Task { [weak self] in
                 await DocumentProcessor.shared.process(documentId: document.id)
-                await self.refreshDocument(id: document.id)
+                await self?.refreshDocument(id: document.id)
             }
         } catch {
-            print("Error importando archivo: \(error)")
+            AppLogger.error("Error importando archivo: \(error.localizedDescription)")
+            userErrorMessage = "No se pudo guardar el archivo importado."
         }
     }
 
@@ -122,12 +127,13 @@ final class LibraryViewModel: ObservableObject {
             try await repository.save(document)
             documents.insert(document, at: 0)
 
-            Task.detached {
+            Task { [weak self] in
                 await DocumentProcessor.shared.process(documentId: document.id)
-                await self.refreshDocument(id: document.id)
+                await self?.refreshDocument(id: document.id)
             }
         } catch {
-            print("Error guardando foto: \(error)")
+            AppLogger.error("Error guardando foto: \(error.localizedDescription)")
+            userErrorMessage = "No se pudo guardar la foto capturada."
         }
     }
 

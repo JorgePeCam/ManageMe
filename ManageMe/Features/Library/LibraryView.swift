@@ -81,6 +81,18 @@ struct LibraryView: View {
             .task {
                 await viewModel.loadDocuments()
             }
+            .alert("Error", isPresented: Binding(
+                get: { viewModel.userErrorMessage != nil },
+                set: { isPresented in
+                    if !isPresented { viewModel.userErrorMessage = nil }
+                }
+            )) {
+                Button("OK", role: .cancel) {
+                    viewModel.userErrorMessage = nil
+                }
+            } message: {
+                Text(viewModel.userErrorMessage ?? "Ha ocurrido un error.")
+            }
         }
     }
 
