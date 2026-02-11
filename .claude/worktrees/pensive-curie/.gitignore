@@ -1,0 +1,23 @@
+# macOS
+.DS_Store
+
+# Xcode
+build/
+*.derivedData
+*.hmap
+*.ipa
+*.o
+
+# Xcode User Data (Tus preferencias personales de ventanas, etc.)
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+
+# Swift Package Manager
+.swiftpm/
+
+
+# Python
+venv/
+__pycache__/
+*.pyc
