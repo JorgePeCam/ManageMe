@@ -5,18 +5,19 @@ struct MainTabView: View {
         TabView {
             LibraryView()
                 .tabItem {
-                    Label("Biblioteca", systemImage: "doc.on.doc")
+                    Label("Biblioteca", systemImage: "square.grid.2x2.fill")
                 }
 
             ChatView()
                 .tabItem {
-                    Label("Preguntar", systemImage: "bubble.left.and.text.bubble.right")
+                    Label("Preguntar", systemImage: "bubble.left.and.bubble.right.fill")
                 }
 
             SettingsView()
                 .tabItem {
-                    Label("Ajustes", systemImage: "gear")
+                    Label("Ajustes", systemImage: "gearshape.fill")
                 }
         }
+        .tint(.appAccent)
     }
 }

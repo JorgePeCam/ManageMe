@@ -6,11 +6,25 @@ final class SettingsViewModel: ObservableObject {
     @Published var documentCount = 0
     @Published var storageUsed = "Calculando..."
     @Published var showDeleteConfirmation = false
+    @Published var apiKey: String = ""
 
     private let repository = DocumentRepository()
 
+    init() {
+        apiKey = UserDefaults.standard.string(forKey: "openai_api_key") ?? ""
+    }
+
     var embeddingModelStatus: String {
         EmbeddingService.shared != nil ? "MiniLM (activo)" : "No disponible"
+    }
+
+    var activeProviderName: String {
+        QAService.shared.activeProviderName
+    }
+
+    func saveApiKey() {
+        let trimmed = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        UserDefaults.standard.set(trimmed, forKey: "openai_api_key")
     }
 
     func loadStats() async {

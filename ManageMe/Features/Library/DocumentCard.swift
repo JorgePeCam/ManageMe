@@ -4,53 +4,60 @@ struct DocumentCard: View {
     let document: Document
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Thumbnail / Icon
+        VStack(alignment: .leading, spacing: 0) {
+            // Thumbnail area
             ZStack {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(.quaternary)
-                    .frame(height: 100)
-
                 if let thumbURL = document.absoluteThumbnailURL,
                    let image = UIImage(contentsOfFile: thumbURL.path) {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFill()
-                        .frame(height: 100)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
                 } else {
+                    // Gradient background with icon
+                    LinearGradient.cardGradient
+
                     Image(systemName: document.fileTypeEnum.systemImage)
-                        .font(.system(size: 32))
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 28, weight: .light))
+                        .foregroundStyle(.appAccent.opacity(0.7))
                 }
             }
+            .frame(height: 110)
+            .clipShape(
+                UnevenRoundedRectangle(
+                    topLeadingRadius: AppStyle.cornerRadius,
+                    bottomLeadingRadius: 0,
+                    bottomTrailingRadius: 0,
+                    topTrailingRadius: AppStyle.cornerRadius
+                )
+            )
 
-            // Title
-            Text(document.title)
-                .font(.subheadline)
-                .fontWeight(.medium)
-                .lineLimit(2)
-                .foregroundStyle(.primary)
+            // Content area
+            VStack(alignment: .leading, spacing: 6) {
+                Text(document.title)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .lineLimit(2)
+                    .foregroundStyle(.primary)
 
-            // Metadata row
-            HStack {
-                Text(document.fileTypeEnum.displayName)
-                    .font(.caption2)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(.blue.opacity(0.1))
-                    .foregroundStyle(.blue)
-                    .clipShape(Capsule())
+                HStack {
+                    Text(document.fileTypeEnum.displayName)
+                        .pillBadge()
 
-                Spacer()
+                    Spacer()
 
-                statusIndicator
+                    statusIndicator
+                }
             }
+            .padding(.horizontal, AppStyle.paddingSmall + 2)
+            .padding(.vertical, AppStyle.paddingSmall)
         }
-        .padding(10)
-        .background(.background)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
+        .background(.appCard)
+        .clipShape(RoundedRectangle(cornerRadius: AppStyle.cornerRadius))
+        .shadow(
+            color: .black.opacity(AppStyle.shadowOpacity),
+            radius: AppStyle.shadowRadius,
+            y: AppStyle.shadowY
+        )
     }
 
     @ViewBuilder
@@ -58,15 +65,16 @@ struct DocumentCard: View {
         switch document.processingStatusEnum {
         case .ready:
             Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(.green)
+                .foregroundStyle(.appSuccess)
                 .font(.caption)
         case .error:
             Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.red)
+                .foregroundStyle(.appDanger)
                 .font(.caption)
         case .pending, .extracting, .chunking, .embedding:
             ProgressView()
                 .scaleEffect(0.7)
+                .tint(.appAccent)
         }
     }
 }

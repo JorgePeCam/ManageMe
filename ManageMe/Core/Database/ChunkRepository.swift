@@ -84,7 +84,11 @@ struct ChunkRepository {
     // MARK: - FTS Search
 
     func searchByKeywords(query: String, limit: Int = 5) async throws -> [SearchResult] {
-        try await db.dbWriter.read { db in
+        // Sanitize query for FTS5: remove special characters, keep only words
+        let sanitized = sanitizeFTSQuery(query)
+        guard !sanitized.isEmpty else { return [] }
+
+        return try await db.dbWriter.read { db in
             let rows = try Row.fetchAll(db, sql: """
                 SELECT c.id, c.content, c.documentId, d.title,
                        rank AS ftsScore
@@ -95,7 +99,7 @@ struct ChunkRepository {
                 AND d.processingStatus = 'ready'
                 ORDER BY rank
                 LIMIT ?
-            """, arguments: [query, limit])
+            """, arguments: [sanitized, limit])
 
             return rows.map { row in
                 SearchResult(
@@ -103,10 +107,24 @@ struct ChunkRepository {
                     chunkContent: row["content"],
                     documentId: row["documentId"],
                     documentTitle: row["title"],
-                    score: 1.0 // FTS uses rank, normalize later
+                    score: 1.0
                 )
             }
         }
+    }
+
+    /// Converts user text into a valid FTS5 query.
+    /// Removes punctuation and joins words with OR for broader matching.
+    private func sanitizeFTSQuery(_ query: String) -> String {
+        let words = query
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty && $0.count > 1 } // skip single-char words
+
+        guard !words.isEmpty else { return "" }
+
+        // Wrap each word in quotes to avoid FTS5 syntax issues, join with OR
+        return words.map { "\"\($0)\"" }.joined(separator: " OR ")
     }
 
     // MARK: - Hybrid Search

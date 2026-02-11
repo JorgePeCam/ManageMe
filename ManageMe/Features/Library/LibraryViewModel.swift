@@ -66,13 +66,18 @@ final class LibraryViewModel: ObservableObject {
 
     private func importFile(from url: URL) async {
         let fileType = TextExtractionService.detectFileType(from: url)
+        // Capture the original filename BEFORE copying (copy renames to UUID)
         let title = url.deletingPathExtension().lastPathComponent
 
         do {
             let (relativePath, fileSize) = try repository.importFile(from: url, fileType: fileType)
+            // Use original filename as title, cleaned up
+            let cleanTitle = title
+                .replacingOccurrences(of: "_", with: " ")
+                .replacingOccurrences(of: "-", with: " ")
 
             let document = Document(
-                title: title,
+                title: cleanTitle,
                 fileType: fileType,
                 fileURL: relativePath,
                 fileSizeBytes: fileSize,
