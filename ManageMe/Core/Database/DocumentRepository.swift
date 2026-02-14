@@ -68,6 +68,35 @@ struct DocumentRepository {
         }
     }
 
+    // MARK: - Folder Queries
+
+    /// Fetch documents in a specific folder (nil = root level)
+    func fetchByFolder(_ folderId: String?) async throws -> [Document] {
+        try await db.dbWriter.read { db in
+            if let folderId {
+                return try Document
+                    .filter(Column("folderId") == folderId)
+                    .order(Column("createdAt").desc)
+                    .fetchAll(db)
+            } else {
+                return try Document
+                    .filter(Column("folderId") == nil)
+                    .order(Column("createdAt").desc)
+                    .fetchAll(db)
+            }
+        }
+    }
+
+    /// Move a document to a folder (nil = root)
+    func moveToFolder(documentId: String, folderId: String?) async throws {
+        try await db.dbWriter.write { db in
+            try db.execute(
+                sql: "UPDATE document SET folderId = ? WHERE id = ?",
+                arguments: [folderId, documentId]
+            )
+        }
+    }
+
     // MARK: - File Management
 
     /// Creates the directories for storing document files and thumbnails

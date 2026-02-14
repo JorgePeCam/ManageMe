@@ -1,44 +1,82 @@
 import Foundation
+#if canImport(FoundationModels)
+import FoundationModels
+#endif
 
 /// Q&A provider using Apple Foundation Models (iOS 26+, on-device)
-/// Falls back gracefully on unsupported devices
-@available(iOS 26, *)
-final class FoundationModelQAProvider: QAProvider {
+/// Runs entirely on-device — free, private, no API key needed
+@available(iOS 26, macOS 26, *)
+final class FoundationModelQAProvider: StreamableQAProvider {
     var name: String { "Apple Intelligence (on-device)" }
+    var kind: QAProviderKind { .onDevice }
 
     var isAvailable: Bool {
-        // Check if Foundation Models framework is available and the model is ready
-        // This will only be true on iPhone 15 Pro+, M1+ iPad, with iOS 26+
-        guard let modelClass = NSClassFromString("FoundationModels.SystemLanguageModel") else {
-            return false
-        }
-        // Check availability via the framework
-        return checkModelAvailability()
+        #if canImport(FoundationModels)
+        return SystemLanguageModel.default.availability == .available
+        #else
+        return false
+        #endif
     }
 
     func answer(query: String, context: [SearchResult]) async throws -> String {
-        // Dynamic loading to avoid compile errors on iOS < 26
-        let prompt = QAService.buildPrompt(query: query, context: context)
-        return try await generateWithFoundationModels(prompt: prompt)
-    }
-
-    private func checkModelAvailability() -> Bool {
-        // Will be implemented when building with iOS 26 SDK
-        // For now, return false to use OpenAI fallback
-        return false
-    }
-
-    private func generateWithFoundationModels(prompt: String) async throws -> String {
-        // Placeholder: will use FoundationModels.SystemLanguageModel when iOS 26 SDK is available
-        // Example future implementation:
-        //
-        // import FoundationModels
-        // let model = SystemLanguageModel.default
-        // guard model.availability == .available else { throw QAError.noProviderAvailable }
-        // let session = LanguageModelSession()
-        // let response = try await session.respond(to: prompt)
-        // return response.content
-        //
+        #if canImport(FoundationModels)
+        // Try with full context first, retry with less if it fails
+        do {
+            return try await generate(query: query, context: context, maxChunks: 2, maxChars: 300)
+        } catch {
+            // Retry with minimal context
+            do {
+                return try await generate(query: query, context: context, maxChunks: 1, maxChars: 200)
+            } catch {
+                throw error
+            }
+        }
+        #else
         throw QAError.noProviderAvailable
+        #endif
+    }
+
+    func streamAnswer(query: String, context: [SearchResult], onUpdate: @escaping (String) -> Void) async throws {
+        #if canImport(FoundationModels)
+        let prompt = buildPrompt(query: query, context: context, maxChunks: 2, maxChars: 300)
+        let session = LanguageModelSession(instructions: Self.instructions)
+
+        do {
+            let stream = session.streamResponse(to: prompt)
+            for try await partial in stream {
+                onUpdate(partial.content)
+            }
+        } catch {
+            // Streaming failed — try non-streaming as fallback
+            let response = try await session.respond(to: prompt)
+            onUpdate(response.content)
+        }
+        #else
+        throw QAError.noProviderAvailable
+        #endif
+    }
+
+    // MARK: - Private
+
+    #if canImport(FoundationModels)
+    private func generate(query: String, context: [SearchResult], maxChunks: Int, maxChars: Int) async throws -> String {
+        let prompt = buildPrompt(query: query, context: context, maxChunks: maxChunks, maxChars: maxChars)
+        let session = LanguageModelSession(instructions: Self.instructions)
+        let response = try await session.respond(to: prompt)
+        return response.content
+    }
+    #endif
+
+    private static let instructions = "Answer concisely using only the provided text. Same language as the question."
+
+    private func buildPrompt(query: String, context: [SearchResult], maxChunks: Int, maxChars: Int) -> String {
+        let chunks = context.prefix(maxChunks)
+        var prompt = ""
+        for result in chunks {
+            let text = String(result.chunkContent.prefix(maxChars))
+            prompt += "\(text)\n\n"
+        }
+        prompt += "Q: \(query)"
+        return prompt
     }
 }

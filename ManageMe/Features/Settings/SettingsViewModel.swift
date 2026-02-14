@@ -6,26 +6,72 @@ final class SettingsViewModel: ObservableObject {
     @Published var documentCount = 0
     @Published var storageUsed = "Calculando..."
     @Published var showDeleteConfirmation = false
-    @Published var apiKey: String = ""
+    @Published var openAIAPIKey = ""
     @Published var userErrorMessage: String?
 
     private let repository = DocumentRepository()
 
     init() {
-        apiKey = UserDefaults.standard.string(forKey: "openai_api_key") ?? ""
+        APIKeyStore.migrateLegacyUserDefaultsKeyIfNeeded()
+        openAIAPIKey = APIKeyStore.loadOpenAIKey()
     }
 
     var embeddingModelStatus: String {
         EmbeddingService.shared != nil ? "MiniLM (activo)" : "No disponible"
     }
 
+    var isAIAvailable: Bool {
+        QAService.shared.hasAnyProvider
+    }
+
+    var isOnDeviceAIActive: Bool {
+        QAService.shared.activeProviderKind == .onDevice
+    }
+
     var activeProviderName: String {
         QAService.shared.activeProviderName
     }
 
-    func saveApiKey() {
-        let trimmed = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        UserDefaults.standard.set(trimmed, forKey: "openai_api_key")
+    var aiStatusText: String {
+        switch QAService.shared.activeProviderKind {
+        case .onDevice:
+            return "Activo — on-device"
+        case .cloud:
+            return "Activo — nube (OpenAI)"
+        case nil:
+            return "No disponible"
+        }
+    }
+
+    var aiFooterText: String {
+        switch QAService.shared.activeProviderKind {
+        case .onDevice:
+            return "Las respuestas se procesan en tu dispositivo. Privado y sin coste."
+        case .cloud:
+            return "Las respuestas se procesan en la nube (OpenAI). Requiere conexión."
+        case nil:
+            return "Activa Apple Intelligence o configura una API key de OpenAI para fallback en la nube."
+        }
+    }
+
+    func saveOpenAIAPIKey() {
+        do {
+            try APIKeyStore.saveOpenAIKey(openAIAPIKey)
+            openAIAPIKey = APIKeyStore.loadOpenAIKey()
+        } catch {
+            AppLogger.error("Error guardando API key en llavero: \(error.localizedDescription)")
+            userErrorMessage = "No se pudo guardar la API key en el llavero."
+        }
+    }
+
+    func clearOpenAIAPIKey() {
+        do {
+            try APIKeyStore.deleteOpenAIKey()
+            openAIAPIKey = ""
+        } catch {
+            AppLogger.error("Error eliminando API key del llavero: \(error.localizedDescription)")
+            userErrorMessage = "No se pudo eliminar la API key del llavero."
+        }
     }
 
     func loadStats() async {
@@ -61,8 +107,8 @@ final class SettingsViewModel: ObservableObject {
             do {
                 let docs = try await repository.fetchAll()
                 for doc in docs {
-                    repository.deleteFile(for: doc)
                     try await repository.delete(id: doc.id)
+                    repository.deleteFile(for: doc)
                 }
                 documentCount = 0
                 storageUsed = "0 bytes"

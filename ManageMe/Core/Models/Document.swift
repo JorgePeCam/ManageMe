@@ -65,6 +65,7 @@ struct Document: Identifiable, Codable, FetchableRecord, PersistableRecord {
     var sourceType: String
     var processingStatus: String
     var errorMessage: String?
+    var folderId: String?
 
     init(
         id: String = UUID().uuidString,
@@ -77,7 +78,8 @@ struct Document: Identifiable, Codable, FetchableRecord, PersistableRecord {
         thumbnailURL: String? = nil,
         sourceType: SourceType = .files,
         processingStatus: ProcessingStatus = .pending,
-        errorMessage: String? = nil
+        errorMessage: String? = nil,
+        folderId: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -90,6 +92,7 @@ struct Document: Identifiable, Codable, FetchableRecord, PersistableRecord {
         self.sourceType = sourceType.rawValue
         self.processingStatus = processingStatus.rawValue
         self.errorMessage = errorMessage
+        self.folderId = folderId
     }
 
     var fileTypeEnum: FileType {

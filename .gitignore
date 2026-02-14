@@ -17,6 +17,9 @@ build/
 .swiftpm/
 
 
+# Secrets
+Config.plist
+
 # Python
 venv/
 __pycache__/

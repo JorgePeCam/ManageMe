@@ -14,6 +14,8 @@ struct TextExtractionService {
             return try await extractFromImage(url: url)
         case .docx:
             return try extractFromDOCX(url: url)
+        case .xlsx:
+            return try extractFromXLSX(url: url)
         case .text:
             return try String(contentsOf: url, encoding: .utf8)
         default:
@@ -129,6 +131,77 @@ struct TextExtractionService {
         return parser.parse(data: xmlData)
     }
 
+    // MARK: - XLSX Extraction
+
+    private func extractFromXLSX(url: URL) throws -> String {
+        let data = try Data(contentsOf: url)
+        let sharedStrings = parseSharedStrings(from: data)
+
+        var sheetOutputs: [String] = []
+        let workbookSheets = parseWorkbookSheets(from: data)
+
+        if !workbookSheets.isEmpty {
+            for sheet in workbookSheets {
+                guard let sheetData = ZIPReader.extractFile(named: sheet.path, from: data) else { continue }
+                let content = XLSXSheetParser(sharedStrings: sharedStrings).parse(data: sheetData)
+                if !content.isEmpty {
+                    sheetOutputs.append("Hoja: \(sheet.name)\n\(content)")
+                }
+            }
+        }
+
+        // Fallback for simple workbooks where workbook metadata is unavailable
+        if sheetOutputs.isEmpty {
+            for index in 1...30 {
+                let path = "xl/worksheets/sheet\(index).xml"
+                guard let sheetData = ZIPReader.extractFile(named: path, from: data) else { continue }
+                let content = XLSXSheetParser(sharedStrings: sharedStrings).parse(data: sheetData)
+                if !content.isEmpty {
+                    sheetOutputs.append("Hoja \(index)\n\(content)")
+                }
+            }
+        }
+
+        let extracted = sheetOutputs.joined(separator: "\n\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !extracted.isEmpty else {
+            throw ExtractionError.invalidFormat
+        }
+
+        return extracted
+    }
+
+    private func parseSharedStrings(from zipData: Data) -> [String] {
+        guard let sharedStringsData = ZIPReader.extractFile(named: "xl/sharedStrings.xml", from: zipData) else {
+            return []
+        }
+        return XLSXSharedStringsParser().parse(data: sharedStringsData)
+    }
+
+    private func parseWorkbookSheets(from zipData: Data) -> [XLSXSheetReference] {
+        guard let workbookData = ZIPReader.extractFile(named: "xl/workbook.xml", from: zipData),
+              let relsData = ZIPReader.extractFile(named: "xl/_rels/workbook.xml.rels", from: zipData) else {
+            return []
+        }
+
+        let workbookSheets = XLSXWorkbookParser().parse(data: workbookData)
+        let relationMap = XLSXWorkbookRelsParser().parse(data: relsData)
+
+        return workbookSheets.compactMap { sheet in
+            guard let target = relationMap[sheet.relationshipId] else { return nil }
+            let normalizedPath: String
+            if target.hasPrefix("xl/") {
+                normalizedPath = target
+            } else if target.hasPrefix("/") {
+                normalizedPath = String(target.dropFirst())
+            } else {
+                normalizedPath = "xl/\(target)"
+            }
+            return XLSXSheetReference(name: sheet.name, path: normalizedPath)
+        }
+    }
+
     // MARK: - File Type Detection
 
     static func detectFileType(from url: URL) -> FileType {
@@ -153,6 +226,231 @@ struct TextExtractionService {
 }
 
 // MARK: - DOCX XML Parser
+
+private struct XLSXSheetReference {
+    let name: String
+    let path: String
+}
+
+private struct XLSXWorkbookSheet {
+    let name: String
+    let relationshipId: String
+}
+
+private final class XLSXWorkbookParser: NSObject, XMLParserDelegate {
+    private var sheets: [XLSXWorkbookSheet] = []
+
+    func parse(data: Data) -> [XLSXWorkbookSheet] {
+        let parser = XMLParser(data: data)
+        parser.delegate = self
+        parser.parse()
+        return sheets
+    }
+
+    func parser(_ parser: XMLParser, didStartElement elementName: String, namespaceURI: String?, qualifiedName: String?, attributes: [String: String]) {
+        guard elementName == "sheet" || elementName.hasSuffix(":sheet") else { return }
+        guard let relationId = attributes["r:id"] ?? attributes["id"],
+              !relationId.isEmpty else { return }
+        let name = attributes["name"] ?? "Hoja"
+        sheets.append(XLSXWorkbookSheet(name: name, relationshipId: relationId))
+    }
+}
+
+private final class XLSXWorkbookRelsParser: NSObject, XMLParserDelegate {
+    private var relations: [String: String] = [:]
+
+    func parse(data: Data) -> [String: String] {
+        let parser = XMLParser(data: data)
+        parser.delegate = self
+        parser.parse()
+        return relations
+    }
+
+    func parser(_ parser: XMLParser, didStartElement elementName: String, namespaceURI: String?, qualifiedName: String?, attributes: [String: String]) {
+        guard elementName == "Relationship" else { return }
+        guard let identifier = attributes["Id"],
+              let target = attributes["Target"] else { return }
+
+        let relationType = attributes["Type"] ?? ""
+        if relationType.contains("/worksheet") {
+            relations[identifier] = target
+        }
+    }
+}
+
+private final class XLSXSharedStringsParser: NSObject, XMLParserDelegate {
+    private var strings: [String] = []
+    private var currentString = ""
+    private var insideSharedItem = false
+    private var insideText = false
+
+    func parse(data: Data) -> [String] {
+        let parser = XMLParser(data: data)
+        parser.delegate = self
+        parser.parse()
+        return strings
+    }
+
+    func parser(_ parser: XMLParser, didStartElement elementName: String, namespaceURI: String?, qualifiedName: String?, attributes: [String: String]) {
+        if elementName == "si" || elementName.hasSuffix(":si") {
+            insideSharedItem = true
+            currentString = ""
+        } else if insideSharedItem && (elementName == "t" || elementName.hasSuffix(":t")) {
+            insideText = true
+        }
+    }
+
+    func parser(_ parser: XMLParser, foundCharacters string: String) {
+        if insideText {
+            currentString += string
+        }
+    }
+
+    func parser(_ parser: XMLParser, didEndElement elementName: String, namespaceURI: String?, qualifiedName: String?) {
+        if elementName == "t" || elementName.hasSuffix(":t") {
+            insideText = false
+            return
+        }
+
+        if elementName == "si" || elementName.hasSuffix(":si") {
+            strings.append(currentString.trimmingCharacters(in: .whitespacesAndNewlines))
+            insideSharedItem = false
+            currentString = ""
+        }
+    }
+}
+
+private final class XLSXSheetParser: NSObject, XMLParserDelegate {
+    private let sharedStrings: [String]
+    private var rowValues: [Int: String] = [:]
+    private var rowLines: [String] = []
+
+    private var currentCellReference: String?
+    private var currentCellType: String?
+    private var currentCellValue = ""
+
+    private var isInsideValue = false
+    private var isInsideInlineText = false
+
+    init(sharedStrings: [String]) {
+        self.sharedStrings = sharedStrings
+        super.init()
+    }
+
+    func parse(data: Data) -> String {
+        let parser = XMLParser(data: data)
+        parser.delegate = self
+        parser.parse()
+
+        return rowLines
+            .joined(separator: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    func parser(_ parser: XMLParser, didStartElement elementName: String, namespaceURI: String?, qualifiedName: String?, attributes: [String: String]) {
+        if elementName == "row" || elementName.hasSuffix(":row") {
+            rowValues = [:]
+            return
+        }
+
+        if elementName == "c" || elementName.hasSuffix(":c") {
+            currentCellReference = attributes["r"]
+            currentCellType = attributes["t"]
+            currentCellValue = ""
+            return
+        }
+
+        if elementName == "v" || elementName.hasSuffix(":v") {
+            isInsideValue = true
+            currentCellValue = ""
+            return
+        }
+
+        if (elementName == "t" || elementName.hasSuffix(":t")),
+           currentCellType == "inlineStr" {
+            isInsideInlineText = true
+            currentCellValue = ""
+        }
+    }
+
+    func parser(_ parser: XMLParser, foundCharacters string: String) {
+        if isInsideValue || isInsideInlineText {
+            currentCellValue += string
+        }
+    }
+
+    func parser(_ parser: XMLParser, didEndElement elementName: String, namespaceURI: String?, qualifiedName: String?) {
+        if elementName == "v" || elementName.hasSuffix(":v") {
+            isInsideValue = false
+            commitCurrentCellValue()
+            return
+        }
+
+        if (elementName == "t" || elementName.hasSuffix(":t")),
+           currentCellType == "inlineStr" {
+            isInsideInlineText = false
+            commitCurrentCellValue()
+            return
+        }
+
+        if elementName == "c" || elementName.hasSuffix(":c") {
+            currentCellReference = nil
+            currentCellType = nil
+            currentCellValue = ""
+            return
+        }
+
+        if elementName == "row" || elementName.hasSuffix(":row") {
+            let ordered = rowValues.keys.sorted().compactMap { rowValues[$0] }
+            let line = ordered.joined(separator: " | ")
+            if !line.isEmpty {
+                rowLines.append(line)
+            }
+        }
+    }
+
+    private func commitCurrentCellValue() {
+        let value: String
+        switch currentCellType {
+        case "s":
+            if let index = Int(currentCellValue.trimmingCharacters(in: .whitespacesAndNewlines)),
+               index >= 0, index < sharedStrings.count {
+                value = sharedStrings[index]
+            } else {
+                value = currentCellValue
+            }
+        case "b":
+            value = currentCellValue == "1" ? "TRUE" : "FALSE"
+        default:
+            value = currentCellValue
+        }
+
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        if let reference = currentCellReference,
+           let column = Self.columnIndex(from: reference) {
+            rowValues[column] = trimmed
+        } else {
+            let fallbackColumn = (rowValues.keys.max() ?? 0) + 1
+            rowValues[fallbackColumn] = trimmed
+        }
+    }
+
+    private static func columnIndex(from cellReference: String) -> Int? {
+        let letters = cellReference.uppercased().prefix { $0.isLetter }
+        guard !letters.isEmpty else { return nil }
+
+        var index = 0
+        for letter in letters {
+            guard let ascii = letter.asciiValue else { return nil }
+            let value = Int(ascii) - 64 // A = 1
+            guard (1...26).contains(value) else { return nil }
+            index = index * 26 + value
+        }
+        return index
+    }
+}
 
 private class DOCXParser: NSObject, XMLParserDelegate {
     private var text = ""

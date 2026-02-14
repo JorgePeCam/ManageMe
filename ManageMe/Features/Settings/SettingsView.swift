@@ -2,58 +2,71 @@ import SwiftUI
 
 struct SettingsView: View {
     @StateObject private var viewModel = SettingsViewModel()
+    @State private var showCloudKey = false
 
     var body: some View {
         NavigationStack {
             List {
-                // AI Section - Highlighted
+                // AI Section
                 Section {
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack(spacing: 10) {
-                            Image(systemName: "brain.head.profile")
-                                .font(.title3)
-                                .foregroundStyle(Color.appAccent)
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Proveedor de IA")
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                                Text(viewModel.activeProviderName)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-
-                    HStack {
-                        Image(systemName: "key.fill")
+                    HStack(spacing: 12) {
+                        Image(systemName: "brain.head.profile")
+                            .font(.title3)
                             .foregroundStyle(Color.appAccent)
-                            .frame(width: 24)
 
-                        SecureField("API Key de OpenAI", text: $viewModel.apiKey)
-                            .textContentType(.password)
-                            .autocorrectionDisabled()
-                            .textInputAutocapitalization(.never)
-                            .onChange(of: viewModel.apiKey) {
-                                viewModel.saveApiKey()
-                            }
-                    }
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(viewModel.activeProviderName)
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                            Text(viewModel.aiStatusText)
+                                .font(.caption)
+                                .foregroundStyle(viewModel.isOnDeviceAIActive ? Color.appSuccess : .secondary)
+                        }
 
-                    if viewModel.apiKey.isEmpty {
-                        Label("Necesitas una API key para respuestas inteligentes",
-                              systemImage: "exclamationmark.triangle.fill")
-                            .font(.caption)
-                            .foregroundStyle(Color.appWarning)
-                    } else {
-                        Label("API key configurada",
-                              systemImage: "checkmark.circle.fill")
-                            .font(.caption)
-                            .foregroundStyle(Color.appSuccess)
+                        Spacer()
+
+                        Image(systemName: viewModel.isAIAvailable ? "checkmark.circle.fill" : "xmark.circle")
+                            .foregroundStyle(viewModel.isOnDeviceAIActive ? Color.appSuccess : .secondary)
                     }
                 } header: {
                     Text("Inteligencia Artificial")
                 } footer: {
-                    Text("Consigue tu API key en platform.openai.com.\nSe usa GPT-4o mini (rapido y economico).")
+                    Text(viewModel.aiFooterText)
+                }
+
+                Section {
+                    VStack(alignment: .leading, spacing: 10) {
+                        if showCloudKey {
+                            TextField("sk-...", text: $viewModel.openAIAPIKey)
+                                .textInputAutocapitalization(.never)
+                                .disableAutocorrection(true)
+                        } else {
+                            SecureField("sk-...", text: $viewModel.openAIAPIKey)
+                                .textInputAutocapitalization(.never)
+                                .disableAutocorrection(true)
+                        }
+
+                        Toggle("Mostrar clave", isOn: $showCloudKey)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    HStack {
+                        Button("Guardar clave") {
+                            viewModel.saveOpenAIAPIKey()
+                        }
+                        .disabled(viewModel.openAIAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                        Spacer()
+
+                        Button("Eliminar clave", role: .destructive) {
+                            viewModel.clearOpenAIAPIKey()
+                        }
+                    }
+                } header: {
+                    Text("Fallback OpenAI (opcional)")
+                } footer: {
+                    Text("La clave se guarda en el llavero del dispositivo.")
                 }
 
                 // Storage
@@ -105,7 +118,7 @@ struct SettingsView: View {
                 // About
                 Section {
                     HStack {
-                        Label("Version", systemImage: "info.circle")
+                        Label("Versión", systemImage: "info.circle")
                         Spacer()
                         Text("1.0.0")
                             .foregroundStyle(.secondary)

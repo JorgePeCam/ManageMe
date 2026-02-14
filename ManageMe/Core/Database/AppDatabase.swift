@@ -96,6 +96,23 @@ final class AppDatabase {
             """)
         }
 
+        migrator.registerMigration("addFolders") { db in
+            // Create folder table
+            try db.create(table: "folder") { t in
+                t.column("id", .text).primaryKey()
+                t.column("name", .text).notNull()
+                t.column("parentFolderId", .text)
+                    .references("folder", onDelete: .cascade)
+                t.column("createdAt", .datetime).notNull()
+            }
+
+            // Add folderId to existing documents (nullable — nil means root)
+            try db.alter(table: "document") { t in
+                t.add(column: "folderId", .text)
+                    .references("folder", onDelete: .setNull)
+            }
+        }
+
         return migrator
     }
 }

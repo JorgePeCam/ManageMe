@@ -199,7 +199,7 @@ struct MessageBubble: View {
                         .foregroundStyle(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 18))
                 } else {
-                    Text(message.content)
+                    Text(Self.markdownContent(message.content))
                         .padding(.horizontal, 16)
                         .padding(.vertical, 12)
                         .background(Color.appCard)
@@ -216,6 +216,14 @@ struct MessageBubble: View {
                 citationsView
             }
         }
+    }
+
+    /// Parse markdown for bot messages with fallback to plain text
+    private static func markdownContent(_ content: String) -> AttributedString {
+        (try? AttributedString(
+            markdown: content,
+            options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+        )) ?? AttributedString(content)
     }
 
     private var citationsView: some View {

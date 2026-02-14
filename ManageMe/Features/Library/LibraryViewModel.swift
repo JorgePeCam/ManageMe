@@ -6,12 +6,19 @@ import UniformTypeIdentifiers
 @MainActor
 final class LibraryViewModel: ObservableObject {
     @Published var documents: [Document] = []
+    @Published var folders: [Folder] = []
     @Published var showImporter = false
     @Published var showCamera = false
     @Published var filterType: FileType?
     @Published var userErrorMessage: String?
 
+    // Folder navigation
+    @Published var currentFolderId: String?
+    @Published var folderPath: [Folder] = []
+    @Published var documentCounts: [String: Int] = [:]
+
     private let repository = DocumentRepository()
+    private let folderRepository = FolderRepository()
 
     let allowedContentTypes: [UTType] = [
         .pdf, .image, .plainText,
@@ -24,14 +31,121 @@ final class LibraryViewModel: ObservableObject {
         return documents.filter { $0.fileType == filterType.rawValue }
     }
 
+    var isInFolder: Bool {
+        currentFolderId != nil
+    }
+
+    var currentFolderName: String {
+        folderPath.last?.name ?? "Biblioteca"
+    }
+
     func loadDocuments() async {
         do {
-            documents = try await repository.fetchAll()
+            // Load documents for current folder
+            documents = try await repository.fetchByFolder(currentFolderId)
+
+            // Load subfolders
+            if let folderId = currentFolderId {
+                folders = try await folderRepository.fetchChildren(of: folderId)
+            } else {
+                folders = try await folderRepository.fetchRootFolders()
+            }
+
+            // Load document counts for visible folders
+            var counts: [String: Int] = [:]
+            for folder in folders {
+                counts[folder.id] = try await folderRepository.documentCount(folderId: folder.id)
+            }
+            documentCounts = counts
         } catch {
             AppLogger.error("Error cargando documentos: \(error.localizedDescription)")
             userErrorMessage = "No se pudieron cargar los documentos."
         }
     }
+
+    // MARK: - Folder Navigation
+
+    func navigateToFolder(_ folder: Folder) {
+        folderPath.append(folder)
+        currentFolderId = folder.id
+        Task { await loadDocuments() }
+    }
+
+    func navigateBack() {
+        guard !folderPath.isEmpty else { return }
+        folderPath.removeLast()
+        currentFolderId = folderPath.last?.id
+        Task { await loadDocuments() }
+    }
+
+    func navigateToRoot() {
+        folderPath = []
+        currentFolderId = nil
+        Task { await loadDocuments() }
+    }
+
+    // MARK: - Folder CRUD
+
+    func createFolder(name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        Task {
+            do {
+                let folder = Folder(name: trimmed, parentFolderId: currentFolderId)
+                try await folderRepository.save(folder)
+                await loadDocuments()
+            } catch {
+                AppLogger.error("Error creando carpeta: \(error.localizedDescription)")
+                userErrorMessage = "No se pudo crear la carpeta."
+            }
+        }
+    }
+
+    func renameFolder(_ folder: Folder, newName: String) {
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        Task {
+            do {
+                var updated = folder
+                updated.name = trimmed
+                try await folderRepository.update(updated)
+                await loadDocuments()
+            } catch {
+                AppLogger.error("Error renombrando carpeta: \(error.localizedDescription)")
+                userErrorMessage = "No se pudo renombrar la carpeta."
+            }
+        }
+    }
+
+    func deleteFolder(id: String) {
+        Task {
+            do {
+                try await folderRepository.delete(id: id)
+                await loadDocuments()
+            } catch {
+                AppLogger.error("Error eliminando carpeta: \(error.localizedDescription)")
+                userErrorMessage = "No se pudo eliminar la carpeta."
+            }
+        }
+    }
+
+    // MARK: - Move Documents
+
+    func moveDocument(_ documentId: String, toFolder folderId: String?) {
+        Task {
+            do {
+                try await repository.moveToFolder(documentId: documentId, folderId: folderId)
+                await loadDocuments()
+            } catch {
+                AppLogger.error("Error moviendo documento: \(error.localizedDescription)")
+                userErrorMessage = "No se pudo mover el documento."
+            }
+        }
+    }
+
+    // MARK: - Document CRUD
 
     func handleFileImport(result: Result<[URL], Error>) {
         switch result {
@@ -54,10 +168,11 @@ final class LibraryViewModel: ObservableObject {
     func deleteDocument(id: String) {
         Task {
             do {
-                if let doc = documents.first(where: { $0.id == id }) {
+                let doc = documents.first(where: { $0.id == id })
+                try await repository.delete(id: id)
+                if let doc {
                     repository.deleteFile(for: doc)
                 }
-                try await repository.delete(id: id)
                 documents.removeAll { $0.id == id }
             } catch {
                 AppLogger.error("Error eliminando: \(error.localizedDescription)")
@@ -70,12 +185,10 @@ final class LibraryViewModel: ObservableObject {
 
     private func importFile(from url: URL) async {
         let fileType = TextExtractionService.detectFileType(from: url)
-        // Capture the original filename BEFORE copying (copy renames to UUID)
         let title = url.deletingPathExtension().lastPathComponent
 
         do {
             let (relativePath, fileSize) = try repository.importFile(from: url, fileType: fileType)
-            // Use original filename as title, cleaned up
             let cleanTitle = title
                 .replacingOccurrences(of: "_", with: " ")
                 .replacingOccurrences(of: "-", with: " ")
@@ -86,13 +199,13 @@ final class LibraryViewModel: ObservableObject {
                 fileURL: relativePath,
                 fileSizeBytes: fileSize,
                 sourceType: .files,
-                processingStatus: .pending
+                processingStatus: .pending,
+                folderId: currentFolderId
             )
 
             try await repository.save(document)
             documents.insert(document, at: 0)
 
-            // Process in background
             Task { [weak self] in
                 await DocumentProcessor.shared.process(documentId: document.id)
                 await self?.refreshDocument(id: document.id)
@@ -121,7 +234,8 @@ final class LibraryViewModel: ObservableObject {
                 fileURL: relativePath,
                 fileSizeBytes: Int64(data.count),
                 sourceType: .camera,
-                processingStatus: .pending
+                processingStatus: .pending,
+                folderId: currentFolderId
             )
 
             try await repository.save(document)

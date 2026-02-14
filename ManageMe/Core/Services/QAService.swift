@@ -5,21 +5,35 @@ protocol QAProvider {
     func answer(query: String, context: [SearchResult]) async throws -> String
     var isAvailable: Bool { get }
     var name: String { get }
+    var kind: QAProviderKind { get }
 }
 
-/// Orchestrates Q&A: tries on-device first, falls back to API
+/// Protocol for providers that support streaming responses
+protocol StreamableQAProvider: QAProvider {
+    func streamAnswer(query: String, context: [SearchResult], onUpdate: @escaping (String) -> Void) async throws
+}
+
+enum QAProviderKind {
+    case onDevice
+    case cloud
+}
+
+/// Orchestrates Q&A with automatic fallback chain:
+/// 1. Apple Intelligence (on-device, free) — iOS 26+
+/// 2. OpenAI GPT-4o-mini (cloud, fast) — silent fallback
+/// 3. Extractive (no LLM) — last resort, handled by ChatViewModel
 final class QAService {
     static let shared = QAService()
 
     private var providers: [QAProvider] = []
 
     private init() {
-        // 1. Try Apple Foundation Models first (free, private)
-        if #available(iOS 26, *) {
+        // 1. Apple Foundation Models — free, private, on-device
+        if #available(iOS 26, macOS 26, *) {
             providers.append(FoundationModelQAProvider())
         }
 
-        // 2. Fall back to OpenAI API
+        // 2. OpenAI — silent cloud fallback
         providers.append(OpenAIQAProvider())
     }
 
@@ -29,21 +43,61 @@ final class QAService {
     }
 
     var activeProviderName: String {
-        activeProvider?.name ?? "Ninguno"
+        activeProvider?.name ?? "No disponible"
+    }
+
+    var activeProviderKind: QAProviderKind? {
+        activeProvider?.kind
     }
 
     var hasAnyProvider: Bool {
         activeProvider != nil
     }
 
-    func answer(query: String, context: [SearchResult]) async throws -> String {
-        guard let provider = activeProvider else {
-            throw QAError.noProviderAvailable
-        }
-        return try await provider.answer(query: query, context: context)
+    /// Whether the active provider supports streaming
+    var canStream: Bool {
+        activeProvider is StreamableQAProvider
     }
 
-    /// Builds the system prompt for Q&A
+    /// Try each provider in order until one succeeds
+    func answer(query: String, context: [SearchResult]) async throws -> String {
+        var lastError: Error?
+
+        for provider in providers where provider.isAvailable {
+            do {
+                return try await provider.answer(query: query, context: context)
+            } catch {
+                lastError = error
+                continue // Try next provider
+            }
+        }
+
+        throw lastError ?? QAError.noProviderAvailable
+    }
+
+    /// Stream the answer, falling back to non-streaming providers
+    func streamAnswer(query: String, context: [SearchResult], onUpdate: @escaping (String) -> Void) async throws {
+        var lastError: Error?
+
+        for provider in providers where provider.isAvailable {
+            do {
+                if let streamable = provider as? StreamableQAProvider {
+                    try await streamable.streamAnswer(query: query, context: context, onUpdate: onUpdate)
+                } else {
+                    let result = try await provider.answer(query: query, context: context)
+                    onUpdate(result)
+                }
+                return // Success
+            } catch {
+                lastError = error
+                continue // Try next provider
+            }
+        }
+
+        throw lastError ?? QAError.noProviderAvailable
+    }
+
+    /// Backward-compatible prompt builder used by tests and providers.
     static func buildPrompt(query: String, context: [SearchResult]) -> String {
         var prompt = """
         Eres un asistente personal que responde preguntas basándose ÚNICAMENTE en los documentos del usuario.
@@ -70,17 +124,14 @@ final class QAService {
 
 enum QAError: LocalizedError {
     case noProviderAvailable
-    case apiKeyMissing
     case apiError(String)
 
     var errorDescription: String? {
         switch self {
         case .noProviderAvailable:
-            return "No hay ningún proveedor de IA configurado. Añade tu API key de OpenAI en Ajustes."
-        case .apiKeyMissing:
-            return "Falta la API key. Configúrala en Ajustes."
+            return "No se pudo generar una respuesta. Inténtalo de nuevo."
         case .apiError(let message):
-            return "Error de la API: \(message)"
+            return message
         }
     }
 }
