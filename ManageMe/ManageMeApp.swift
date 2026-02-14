@@ -2,6 +2,9 @@ import SwiftUI
 
 @main
 struct ManageMeApp: App {
+    @Environment(\.scenePhase) private var scenePhase
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+
     init() {
         do {
             try DocumentRepository.ensureStorageDirectories()
@@ -13,7 +16,20 @@ struct ManageMeApp: App {
 
     var body: some Scene {
         WindowGroup {
-            MainTabView()
+            if hasCompletedOnboarding {
+                MainTabView()
+                    .task {
+                        await SharedInboxImporter.shared.importPendingFiles()
+                    }
+            } else {
+                OnboardingView(hasCompletedOnboarding: $hasCompletedOnboarding)
+            }
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active else { return }
+            Task {
+                await SharedInboxImporter.shared.importPendingFiles()
+            }
         }
     }
 }

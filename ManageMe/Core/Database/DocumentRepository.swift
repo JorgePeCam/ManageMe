@@ -97,6 +97,17 @@ struct DocumentRepository {
         }
     }
 
+    // MARK: - Thumbnail
+
+    func updateThumbnail(documentId: String, thumbnailURL: String) async throws {
+        try await db.dbWriter.write { db in
+            try db.execute(
+                sql: "UPDATE document SET thumbnailURL = ? WHERE id = ?",
+                arguments: [thumbnailURL, documentId]
+            )
+        }
+    }
+
     // MARK: - File Management
 
     /// Creates the directories for storing document files and thumbnails

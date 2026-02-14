@@ -23,6 +23,7 @@ ManageMe te permite:
 
 - Biblioteca con documentos y **carpetas** (crear, renombrar, borrar, navegar, mover documentos).
 - Importación desde archivos y cámara.
+- **Share Extension** para compartir PDFs e imágenes desde otras apps a ManageMe.
 - Procesamiento automático:
   - extracción de texto,
   - chunking,
@@ -89,6 +90,18 @@ Componentes clave:
 3. Respuesta extractiva local, como último recurso.
 
 La API key de OpenAI se guarda en **Keychain** (llavero), no en texto plano.
+
+---
+
+## Share Extension
+
+ManageMe incluye una extensión de compartir para guardar contenido sin abrir la app manualmente.
+
+Flujo:
+
+1. Desde Safari, Mail, WhatsApp u otra app, usa Compartir -> `Guardar en ManageMe`.
+2. La extensión copia el archivo (PDF/imagen) a un inbox compartido (`App Group`).
+3. Al abrir/activar ManageMe, la app importa ese inbox y lanza su pipeline normal (extract -> chunk -> embeddings).
 
 ---
 

@@ -3,11 +3,12 @@ import SwiftUI
 struct ChatView: View {
     @StateObject private var viewModel = ChatViewModel()
     @FocusState private var isInputFocused: Bool
+    @State private var showHistory = false
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                if viewModel.messages.isEmpty {
+                if viewModel.messages.isEmpty && viewModel.currentConversation == nil {
                     emptyState
                 } else {
                     messageList
@@ -16,19 +17,29 @@ struct ChatView: View {
                 inputBar
             }
             .background(Color.appCardSecondary)
-            .navigationTitle("Preguntar")
+            .navigationTitle(viewModel.currentConversation?.title ?? "Preguntar")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                if !viewModel.messages.isEmpty {
-                    ToolbarItem(placement: .primaryAction) {
-                        Button {
-                            viewModel.clearMessages()
-                        } label: {
-                            Image(systemName: "arrow.counterclockwise")
-                                .foregroundStyle(Color.appAccent)
-                        }
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        showHistory = true
+                    } label: {
+                        Image(systemName: "clock.arrow.trianglehead.counterclockwise.rotate.90")
+                            .foregroundStyle(Color.appAccent)
                     }
                 }
+
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        viewModel.startNewConversation()
+                    } label: {
+                        Image(systemName: "plus.bubble")
+                            .foregroundStyle(Color.appAccent)
+                    }
+                }
+            }
+            .sheet(isPresented: $showHistory) {
+                ConversationHistoryView(viewModel: viewModel, isPresented: $showHistory)
             }
         }
     }
@@ -66,9 +77,62 @@ struct ChatView: View {
                 suggestionCard("¿Qué cubre mi seguro de hogar?", icon: "house.lodge")
             }
 
+            // Recent conversations quick access
+            if !viewModel.conversations.isEmpty {
+                recentConversations
+            }
+
             Spacer()
         }
         .padding(AppStyle.paddingLarge)
+    }
+
+    private var recentConversations: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Conversaciones recientes")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.secondary)
+                    .textCase(.uppercase)
+                    .tracking(0.5)
+                Spacer()
+                Button("Ver todas") {
+                    showHistory = true
+                }
+                .font(.caption)
+                .foregroundStyle(Color.appAccent)
+            }
+
+            ForEach(viewModel.conversations.prefix(3)) { conv in
+                Button {
+                    Task { await viewModel.loadConversation(conv) }
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "bubble.left.and.text.bubble.right")
+                            .font(.caption)
+                            .foregroundStyle(Color.appAccent)
+
+                        Text(conv.title)
+                            .font(.subheadline)
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+
+                        Spacer()
+
+                        Text(conv.updatedAt.relativeFormatted)
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(Color.appCard)
+                    .clipShape(RoundedRectangle(cornerRadius: AppStyle.cornerRadiusSmall))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.top, 8)
     }
 
     private func suggestionCard(_ text: String, icon: String) -> some View {
@@ -235,7 +299,6 @@ struct MessageBubble: View {
                 .textCase(.uppercase)
                 .tracking(0.5)
 
-            // Use Identifiable overload to avoid Binding inference issues
             ForEach(message.citations) { citation in
                 HStack(spacing: 8) {
                     Image(systemName: "doc.text.fill")
@@ -261,5 +324,172 @@ struct MessageBubble: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+// MARK: - Conversation History View
+
+struct ConversationHistoryView: View {
+    @ObservedObject var viewModel: ChatViewModel
+    @Binding var isPresented: Bool
+    @State private var showDeleteAllAlert = false
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if viewModel.conversations.isEmpty {
+                    emptyHistoryState
+                } else {
+                    conversationList
+                }
+            }
+            .navigationTitle("Historial")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cerrar") { isPresented = false }
+                }
+                if !viewModel.conversations.isEmpty {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button(role: .destructive) {
+                            showDeleteAllAlert = true
+                        } label: {
+                            Image(systemName: "trash")
+                                .foregroundStyle(Color.appDanger)
+                        }
+                    }
+                }
+            }
+            .alert("Borrar todo el historial", isPresented: $showDeleteAllAlert) {
+                Button("Cancelar", role: .cancel) { }
+                Button("Borrar todo", role: .destructive) {
+                    Task {
+                        await viewModel.deleteAllConversations()
+                    }
+                }
+            } message: {
+                Text("Se eliminarán todas las conversaciones. Esta acción no se puede deshacer.")
+            }
+        }
+    }
+
+    private var emptyHistoryState: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "bubble.left.and.text.bubble.right")
+                .font(.system(size: 44))
+                .foregroundStyle(.tertiary)
+
+            Text("Sin conversaciones")
+                .font(.headline)
+                .foregroundStyle(.secondary)
+
+            Text("Tus conversaciones aparecerán aquí")
+                .font(.subheadline)
+                .foregroundStyle(.tertiary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var conversationList: some View {
+        List {
+            ForEach(groupedConversations, id: \.key) { group in
+                Section(group.key) {
+                    ForEach(group.conversations) { conv in
+                        Button {
+                            Task {
+                                await viewModel.loadConversation(conv)
+                                isPresented = false
+                            }
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "bubble.left.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(Color.appAccent)
+
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(conv.title)
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
+                                        .foregroundStyle(.primary)
+                                        .lineLimit(2)
+
+                                    Text(conv.updatedAt.relativeFormatted)
+                                        .font(.caption)
+                                        .foregroundStyle(.tertiary)
+                                }
+                            }
+                        }
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button(role: .destructive) {
+                                Task { await viewModel.deleteConversation(conv) }
+                            } label: {
+                                Label("Borrar", systemImage: "trash")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+    }
+
+    private var groupedConversations: [ConversationGroup] {
+        let calendar = Calendar.current
+        var groups: [String: [Conversation]] = [:]
+        let order = ["Hoy", "Ayer", "Esta semana", "Este mes", "Anteriores"]
+
+        for conv in viewModel.conversations {
+            let key: String
+            if calendar.isDateInToday(conv.updatedAt) {
+                key = "Hoy"
+            } else if calendar.isDateInYesterday(conv.updatedAt) {
+                key = "Ayer"
+            } else if calendar.isDate(conv.updatedAt, equalTo: Date(), toGranularity: .weekOfYear) {
+                key = "Esta semana"
+            } else if calendar.isDate(conv.updatedAt, equalTo: Date(), toGranularity: .month) {
+                key = "Este mes"
+            } else {
+                key = "Anteriores"
+            }
+            groups[key, default: []].append(conv)
+        }
+
+        return order.compactMap { key in
+            guard let convs = groups[key], !convs.isEmpty else { return nil }
+            return ConversationGroup(key: key, conversations: convs)
+        }
+    }
+}
+
+private struct ConversationGroup: Hashable {
+    let key: String
+    let conversations: [Conversation]
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(key)
+    }
+
+    static func == (lhs: ConversationGroup, rhs: ConversationGroup) -> Bool {
+        lhs.key == rhs.key
+    }
+}
+
+// MARK: - Date Extension
+
+extension Date {
+    var relativeFormatted: String {
+        let calendar = Calendar.current
+        if calendar.isDateInToday(self) {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "HH:mm"
+            return formatter.string(from: self)
+        } else if calendar.isDateInYesterday(self) {
+            return "Ayer"
+        } else {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "d MMM"
+            formatter.locale = Locale(identifier: "es_ES")
+            return formatter.string(from: self)
+        }
     }
 }

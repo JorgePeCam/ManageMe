@@ -2,13 +2,18 @@ import SwiftUI
 
 struct DocumentCard: View {
     let document: Document
+    @State private var thumbnail: UIImage?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Thumbnail area
             ZStack {
-                if let thumbURL = document.absoluteThumbnailURL,
-                   let image = UIImage(contentsOfFile: thumbURL.path) {
+                if let thumbnail {
+                    Image(uiImage: thumbnail)
+                        .resizable()
+                        .scaledToFill()
+                } else if let thumbURL = document.absoluteThumbnailURL,
+                          let image = UIImage(contentsOfFile: thumbURL.path) {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFill()
@@ -58,6 +63,13 @@ struct DocumentCard: View {
             radius: AppStyle.shadowRadius,
             y: AppStyle.shadowY
         )
+        .task {
+            // Generate thumbnail if we don't have one
+            if document.absoluteThumbnailURL == nil,
+               document.fileTypeEnum == .pdf || document.fileTypeEnum == .image {
+                thumbnail = await ThumbnailService.shared.thumbnail(for: document)
+            }
+        }
     }
 
     @ViewBuilder

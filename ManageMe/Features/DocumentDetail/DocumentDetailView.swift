@@ -1,5 +1,6 @@
 import SwiftUI
 import QuickLook
+import PDFKit
 
 struct DocumentDetailView: View {
     let documentId: String
@@ -10,6 +11,12 @@ struct DocumentDetailView: View {
             if let document = viewModel.document {
                 VStack(spacing: AppStyle.padding) {
                     headerCard(document)
+
+                    // Inline preview for PDFs and images
+                    if let fileURL = document.absoluteFileURL {
+                        inlinePreview(url: fileURL, fileType: document.fileTypeEnum)
+                    }
+
                     statusCard(document)
 
                     if document.absoluteFileURL != nil {
@@ -31,12 +38,24 @@ struct DocumentDetailView: View {
         .navigationTitle(viewModel.document?.title ?? "Documento")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if let doc = viewModel.document, doc.processingStatusEnum == .error {
+            if let doc = viewModel.document {
                 ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        viewModel.reprocess()
+                    Menu {
+                        if doc.processingStatusEnum == .error {
+                            Button {
+                                viewModel.reprocess()
+                            } label: {
+                                Label("Reintentar procesado", systemImage: "arrow.clockwise")
+                            }
+                        }
+
+                        if let url = doc.absoluteFileURL {
+                            ShareLink(item: url) {
+                                Label("Compartir", systemImage: "square.and.arrow.up")
+                            }
+                        }
                     } label: {
-                        Label("Reintentar", systemImage: "arrow.clockwise")
+                        Image(systemName: "ellipsis.circle")
                             .foregroundStyle(Color.appAccent)
                     }
                 }
@@ -48,11 +67,38 @@ struct DocumentDetailView: View {
         }
     }
 
+    // MARK: - Inline Preview
+
+    @ViewBuilder
+    private func inlinePreview(url: URL, fileType: FileType) -> some View {
+        switch fileType {
+        case .pdf:
+            PDFPreviewView(url: url)
+                .frame(height: 300)
+                .clipShape(RoundedRectangle(cornerRadius: AppStyle.cornerRadius))
+                .shadow(color: .black.opacity(AppStyle.shadowOpacity), radius: AppStyle.shadowRadius, y: AppStyle.shadowY)
+                .onTapGesture { viewModel.openPreview() }
+
+        case .image:
+            if let data = try? Data(contentsOf: url), let uiImage = UIImage(data: data) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxHeight: 350)
+                    .clipShape(RoundedRectangle(cornerRadius: AppStyle.cornerRadius))
+                    .shadow(color: .black.opacity(AppStyle.shadowOpacity), radius: AppStyle.shadowRadius, y: AppStyle.shadowY)
+                    .onTapGesture { viewModel.openPreview() }
+            }
+
+        default:
+            EmptyView()
+        }
+    }
+
     // MARK: - Header Card
 
     private func headerCard(_ document: Document) -> some View {
         HStack(spacing: 16) {
-            // Icon with gradient background
             ZStack {
                 RoundedRectangle(cornerRadius: AppStyle.cornerRadius)
                     .fill(LinearGradient.accentSoftGradient)
@@ -179,8 +225,14 @@ struct DocumentDetailView: View {
             HStack {
                 Image(systemName: "text.alignleft")
                     .foregroundStyle(Color.appAccent)
-                Text("Texto extraido")
+                Text("Texto extraído")
                     .fontWeight(.semibold)
+
+                Spacer()
+
+                Text("\(document.content.count) caracteres")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
             }
             .font(.subheadline)
 
@@ -192,5 +244,28 @@ struct DocumentDetailView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .cardStyle()
+    }
+}
+
+// MARK: - PDF Preview (UIKit wrapper)
+
+struct PDFPreviewView: UIViewRepresentable {
+    let url: URL
+
+    func makeUIView(context: Context) -> PDFView {
+        let pdfView = PDFView()
+        pdfView.autoScales = true
+        pdfView.displayMode = .singlePage
+        pdfView.displayDirection = .vertical
+        pdfView.backgroundColor = .secondarySystemBackground
+        pdfView.document = PDFDocument(url: url)
+        pdfView.isUserInteractionEnabled = false
+        return pdfView
+    }
+
+    func updateUIView(_ pdfView: PDFView, context: Context) {
+        if pdfView.document == nil {
+            pdfView.document = PDFDocument(url: url)
+        }
     }
 }

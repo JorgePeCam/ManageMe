@@ -8,9 +8,17 @@
 
 /* Begin PBXBuildFile section */
 		CF716E7D2F38ADD700F31BFB /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = CF716E7C2F38ADD700F31BFB /* GRDB */; };
+		EDBD5E973B6E4FC299B93302 /* ManageMeShareExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 88D5B615743F446CB53E341D /* ManageMeShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		95D1133BF70042A1866AA4A9 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = CF716E442F38A56400F31BFB /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F8688BDD8FDD4FACB2F426A4;
+			remoteInfo = ManageMeShareExtension;
+		};
 		CF716E5C2F38A56400F31BFB /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = CF716E442F38A56400F31BFB /* Project object */;
@@ -28,6 +36,17 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
+		6179D17535C0440085E1FB6F /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				EDBD5E973B6E4FC299B93302 /* ManageMeShareExtension.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		CF716E812F38ADDB00F31BFB /* Embed Frameworks */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
@@ -41,12 +60,18 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		88D5B615743F446CB53E341D /* ManageMeShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ManageMeShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		CF716E4C2F38A56400F31BFB /* ManageMe.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ManageMe.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CF716E5B2F38A56400F31BFB /* ManageMeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ManageMeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		CF716E652F38A56400F31BFB /* ManageMeUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ManageMeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		592A4814945B4650A54D89C8 /* ManageMeShareExtension */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = ManageMeShareExtension;
+			sourceTree = "<group>";
+		};
 		CF716E4E2F38A56400F31BFB /* ManageMe */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = ManageMe;
@@ -65,6 +90,13 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		A78DE8F30D3D4EEEB86AF1AC /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		CF716E492F38A56400F31BFB /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -94,6 +126,7 @@
 			isa = PBXGroup;
 			children = (
 				CF716E4E2F38A56400F31BFB /* ManageMe */,
+				592A4814945B4650A54D89C8 /* ManageMeShareExtension */,
 				CF716E5E2F38A56400F31BFB /* ManageMeTests */,
 				CF716E682F38A56400F31BFB /* ManageMeUITests */,
 				CF716E7B2F38ADD700F31BFB /* Frameworks */,
@@ -105,6 +138,7 @@
 			isa = PBXGroup;
 			children = (
 				CF716E4C2F38A56400F31BFB /* ManageMe.app */,
+				88D5B615743F446CB53E341D /* ManageMeShareExtension.appex */,
 				CF716E5B2F38A56400F31BFB /* ManageMeTests.xctest */,
 				CF716E652F38A56400F31BFB /* ManageMeUITests.xctest */,
 			);
@@ -128,11 +162,13 @@
 				CF716E482F38A56400F31BFB /* Sources */,
 				CF716E492F38A56400F31BFB /* Frameworks */,
 				CF716E4A2F38A56400F31BFB /* Resources */,
+				6179D17535C0440085E1FB6F /* Embed App Extensions */,
 				CF716E812F38ADDB00F31BFB /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				51943CA330954D87ADC00E50 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				CF716E4E2F38A56400F31BFB /* ManageMe */,
@@ -191,6 +227,28 @@
 			productReference = CF716E652F38A56400F31BFB /* ManageMeUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		F8688BDD8FDD4FACB2F426A4 /* ManageMeShareExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 69F4F5C792B540C5AC79BF9A /* Build configuration list for PBXNativeTarget "ManageMeShareExtension" */;
+			buildPhases = (
+				4B391B64DA7941B1A6DD7941 /* Sources */,
+				A78DE8F30D3D4EEEB86AF1AC /* Frameworks */,
+				CE95F8BC8C8D4C07BDBF1B78 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				592A4814945B4650A54D89C8 /* ManageMeShareExtension */,
+			);
+			name = ManageMeShareExtension;
+			packageProductDependencies = (
+			);
+			productName = ManageMeShareExtension;
+			productReference = 88D5B615743F446CB53E341D /* ManageMeShareExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -212,6 +270,9 @@
 						CreatedOnToolsVersion = 26.1.1;
 						TestTargetID = CF716E4B2F38A56400F31BFB;
 					};
+					F8688BDD8FDD4FACB2F426A4 = {
+						CreatedOnToolsVersion = 26.1.1;
+					};
 				};
 			};
 			buildConfigurationList = CF716E472F38A56400F31BFB /* Build configuration list for PBXProject "ManageMe" */;
@@ -232,6 +293,7 @@
 			projectRoot = "";
 			targets = (
 				CF716E4B2F38A56400F31BFB /* ManageMe */,
+				F8688BDD8FDD4FACB2F426A4 /* ManageMeShareExtension */,
 				CF716E5A2F38A56400F31BFB /* ManageMeTests */,
 				CF716E642F38A56400F31BFB /* ManageMeUITests */,
 			);
@@ -239,6 +301,13 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		CE95F8BC8C8D4C07BDBF1B78 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		CF716E4A2F38A56400F31BFB /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -263,6 +332,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		4B391B64DA7941B1A6DD7941 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		CF716E482F38A56400F31BFB /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -287,6 +363,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		51943CA330954D87ADC00E50 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F8688BDD8FDD4FACB2F426A4 /* ManageMeShareExtension */;
+			targetProxy = 95D1133BF70042A1866AA4A9 /* PBXContainerItemProxy */;
+		};
 		CF716E5D2F38A56400F31BFB /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = CF716E4B2F38A56400F31BFB /* ManageMe */;
@@ -300,6 +381,66 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		2A5C7C7218F4481CA557ACA7 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = ManageMeShareExtension/ManageMeShareExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 72929TBAA4;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "ManageMeShareExtension-Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "Jorge-Perez-Campos.ManageMe.ShareExtension";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A84BFC34AD40467F9431D866 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = ManageMeShareExtension/ManageMeShareExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 72929TBAA4;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "ManageMeShareExtension-Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "Jorge-Perez-Campos.ManageMe.ShareExtension";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 		CF716E6D2F38A56400F31BFB /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -426,6 +567,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = ManageMe/ManageMe.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 72929TBAA4;
@@ -469,6 +611,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = ManageMe/ManageMe.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 72929TBAA4;
@@ -594,6 +737,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		69F4F5C792B540C5AC79BF9A /* Build configuration list for PBXNativeTarget "ManageMeShareExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2A5C7C7218F4481CA557ACA7 /* Debug */,
+				A84BFC34AD40467F9431D866 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		CF716E472F38A56400F31BFB /* Build configuration list for PBXProject "ManageMe" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

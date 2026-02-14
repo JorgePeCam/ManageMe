@@ -113,6 +113,27 @@ final class AppDatabase {
             }
         }
 
+        migrator.registerMigration("addConversations") { db in
+            try db.create(table: "conversation") { t in
+                t.column("id", .text).primaryKey()
+                t.column("title", .text).notNull().defaults(to: "Nueva conversación")
+                t.column("createdAt", .datetime).notNull()
+                t.column("updatedAt", .datetime).notNull()
+            }
+
+            try db.create(table: "chatMessage") { t in
+                t.column("id", .text).primaryKey()
+                t.column("conversationId", .text).notNull()
+                    .references("conversation", onDelete: .cascade)
+                t.column("content", .text).notNull()
+                t.column("isUser", .boolean).notNull()
+                t.column("timestamp", .datetime).notNull()
+                t.column("citationsJSON", .text)
+            }
+
+            try db.create(index: "chatMessage_conversationId", on: "chatMessage", columns: ["conversationId"])
+        }
+
         return migrator
     }
 }

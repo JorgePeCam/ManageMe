@@ -16,6 +16,9 @@ build/
 # Swift Package Manager
 .swiftpm/
 
+# Tooling
+.claude/
+
 
 # Secrets
 Config.plist

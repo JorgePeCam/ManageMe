@@ -93,6 +93,11 @@ struct LibraryView: View {
             .task {
                 await viewModel.loadDocuments()
             }
+            .onReceive(NotificationCenter.default.publisher(for: .sharedInboxDidImportDocuments)) { _ in
+                Task {
+                    await viewModel.loadDocuments()
+                }
+            }
             .alert("Nueva carpeta", isPresented: $showNewFolderAlert) {
                 TextField("Nombre", text: $newFolderName)
                 Button("Crear") {
