@@ -11,16 +11,27 @@ struct Conversation: Identifiable, Codable, FetchableRecord, PersistableRecord {
     var createdAt: Date
     var updatedAt: Date
 
+    // Sync metadata
+    var syncChangeTag: String?
+    var needsSyncPush: Bool
+    var modifiedAt: Date?
+
     init(
         id: String = UUID().uuidString,
         title: String = "Nueva conversación",
         createdAt: Date = Date(),
-        updatedAt: Date = Date()
+        updatedAt: Date = Date(),
+        syncChangeTag: String? = nil,
+        needsSyncPush: Bool = true,
+        modifiedAt: Date? = Date()
     ) {
         self.id = id
         self.title = title
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+        self.syncChangeTag = syncChangeTag
+        self.needsSyncPush = needsSyncPush
+        self.modifiedAt = modifiedAt
     }
 }
 
@@ -36,13 +47,21 @@ struct PersistedChatMessage: Identifiable, Codable, FetchableRecord, Persistable
     var timestamp: Date
     var citationsJSON: String?
 
+    // Sync metadata
+    var syncChangeTag: String?
+    var needsSyncPush: Bool
+    var modifiedAt: Date?
+
     init(
         id: String = UUID().uuidString,
         conversationId: String,
         content: String,
         isUser: Bool,
         timestamp: Date = Date(),
-        citations: [Citation] = []
+        citations: [Citation] = [],
+        syncChangeTag: String? = nil,
+        needsSyncPush: Bool = true,
+        modifiedAt: Date? = Date()
     ) {
         self.id = id
         self.conversationId = conversationId
@@ -50,6 +69,9 @@ struct PersistedChatMessage: Identifiable, Codable, FetchableRecord, Persistable
         self.isUser = isUser
         self.timestamp = timestamp
         self.citationsJSON = citations.isEmpty ? nil : Self.encodeCitations(citations)
+        self.syncChangeTag = syncChangeTag
+        self.needsSyncPush = needsSyncPush
+        self.modifiedAt = modifiedAt
     }
 
     var citations: [Citation] {

@@ -7,6 +7,7 @@ enum SharedContainerConfig {
 
 extension Notification.Name {
     static let sharedInboxDidImportDocuments = Notification.Name("sharedInboxDidImportDocuments")
+    static let allDataDidDelete = Notification.Name("allDataDidDelete")
 }
 
 @MainActor

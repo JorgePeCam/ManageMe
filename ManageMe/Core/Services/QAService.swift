@@ -102,12 +102,14 @@ final class QAService {
         var prompt = """
         Eres un asistente personal que responde preguntas basándose ÚNICAMENTE en los documentos del usuario.
 
-        REGLAS:
+        REGLAS ESTRICTAS:
+        - Responde SOLO con información que aparezca EXPLÍCITAMENTE en los fragmentos proporcionados
+        - Si los fragmentos NO contienen información relevante para la pregunta, responde EXACTAMENTE: "No encontré información sobre esto en tus documentos."
+        - NO inventes, deduzcas ni supongas información que no esté escrita en los fragmentos
         - Responde de forma concisa y directa
-        - Solo usa información que aparezca en los fragmentos proporcionados
-        - Si la información no está en los fragmentos, dilo claramente
         - Usa formato claro: fechas, horas, lugares en líneas separadas
         - Responde en el mismo idioma que la pregunta
+        - Cita el nombre del documento cuando sea relevante
 
         FRAGMENTOS DE DOCUMENTOS:
         """

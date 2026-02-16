@@ -15,9 +15,26 @@ final class ChatViewModel: ObservableObject {
     private let chunkRepo = ChunkRepository()
     private let qaService = QAService.shared
     private let conversationRepo = ConversationRepository()
+    private var cancellables = Set<AnyCancellable>()
 
     init() {
         Task { await loadConversations() }
+
+        NotificationCenter.default.publisher(for: .allDataDidDelete)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.handleAllDataDeleted()
+            }
+            .store(in: &cancellables)
+    }
+
+    private func handleAllDataDeleted() {
+        conversations = []
+        currentConversation = nil
+        messages = []
+        queryText = ""
+        streamingText = ""
+        isSearching = false
     }
 
     // MARK: - Conversation Management
@@ -126,10 +143,11 @@ final class ChatViewModel: ObservableObject {
                 queryVector: queryVector,
                 queryText: query,
                 limit: 5,
-                minScore: 0.15
+                minScore: 0.3
             )
 
-            if results.isEmpty {
+            // Check that results are truly relevant (top score must be above threshold)
+            if results.isEmpty || results[0].score < 0.35 {
                 await addBotMessage("No encontré información relevante en tus documentos. Prueba con otra pregunta o importa más archivos.")
                 return
             }
@@ -255,6 +273,11 @@ final class ChatViewModel: ObservableObject {
                 .filter { $0.count > 2 }
         )
 
+        // Also keep original cased words for proper noun matching (e.g. "Indra")
+        let queryWordsOriginal = query
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { $0.count > 2 }
+
         let dataPatterns: [String] = [
             "\\d{1,2}[:/]\\d{2}",
             "\\d{1,2}\\s+(ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)",
@@ -267,26 +290,28 @@ final class ChatViewModel: ObservableObject {
 
         let boilerplate = ["contacto", "teléfono", "llamar", "sitio web", "www.", "http", "política", "condiciones", "registro", "raee"]
 
-        // Score each result as a whole to pick the BEST document first
-        // This avoids mixing lines from different documents
+        // Score each result as a whole to pick the BEST document
         var bestResultIndex = 0
         var bestResultScore = 0
 
         for (idx, result) in results.prefix(3).enumerated() {
-            let lines = result.chunkContent
-                .components(separatedBy: .newlines)
-                .map { $0.trimmingCharacters(in: .whitespaces) }
-                .filter { !$0.isEmpty && $0.count > 3 }
-
+            let chunkLower = result.chunkContent.lowercased()
             var totalScore = 0
-            for line in lines {
-                let lineWords = Set(
-                    line.lowercased()
-                        .components(separatedBy: CharacterSet.alphanumerics.inverted)
-                        .filter { $0.count > 2 }
-                )
-                totalScore += queryWords.intersection(lineWords).count * 3
+
+            // Count query words that appear in the chunk
+            for word in queryWords {
+                if chunkLower.contains(word) {
+                    totalScore += 5
+                }
             }
+
+            // Bonus for proper nouns found verbatim
+            for word in queryWordsOriginal {
+                if word.first?.isUppercase == true && result.chunkContent.contains(word) {
+                    totalScore += 8
+                }
+            }
+
             // Boost by search score
             totalScore += Int(result.score * 10)
 
@@ -296,8 +321,16 @@ final class ChatViewModel: ObservableObject {
             }
         }
 
-        // Now extract the best lines from the winning document only
+        // Check if the best result actually has query word matches
+        // If no query words match at all, the results are likely irrelevant
         let bestResult = results[bestResultIndex]
+        let bestChunkLower = bestResult.chunkContent.lowercased()
+        let matchingQueryWords = queryWords.filter { bestChunkLower.contains($0) }
+
+        if matchingQueryWords.isEmpty && bestResult.score < 0.5 {
+            return "No encontré información específica sobre tu consulta en los documentos."
+        }
+
         let lines = bestResult.chunkContent
             .components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespaces) }
@@ -307,47 +340,46 @@ final class ChatViewModel: ObservableObject {
 
         for line in lines {
             var score = 0
+            let lineLower = line.lowercased()
 
             let lineWords = Set(
-                line.lowercased()
+                lineLower
                     .components(separatedBy: CharacterSet.alphanumerics.inverted)
                     .filter { $0.count > 2 }
             )
-            score += queryWords.intersection(lineWords).count * 2
+            score += queryWords.intersection(lineWords).count * 3
+
+            // Bonus for proper noun exact match in line
+            for word in queryWordsOriginal {
+                if word.first?.isUppercase == true && line.contains(word) {
+                    score += 5
+                }
+            }
 
             for pattern in dataPatterns {
                 if line.range(of: pattern, options: .regularExpression, range: nil, locale: nil) != nil {
-                    score += 3
+                    score += 2
                 }
             }
 
             if line.count > 120 { score -= 2 }
 
             for word in boilerplate {
-                if line.lowercased().contains(word) { score -= 3 }
+                if lineLower.contains(word) { score -= 3 }
             }
 
-            // Always include lines with query word matches even if score is low
-            if score > 0 || !queryWords.intersection(
-                Set(line.lowercased().components(separatedBy: CharacterSet.alphanumerics.inverted).filter { $0.count > 2 })
-            ).isEmpty {
-                scoredLines.append((line, max(score, 1)))
+            if score > 0 {
+                scoredLines.append((line, score))
             }
         }
 
+        // Also include context lines around high-scoring lines
         let topLines = scoredLines
             .sorted { $0.score > $1.score }
-            .prefix(6)
+            .prefix(8)
 
         if topLines.isEmpty {
-            // Fallback: show first meaningful lines from best result
-            let fallbackLines = lines
-                .filter { $0.count < 100 }
-                .prefix(4)
-                .joined(separator: "\n")
-            return fallbackLines.isEmpty
-                ? "No encontré información específica sobre tu consulta."
-                : "Encontré esto en **\(bestResult.documentTitle)**:\n\n\(fallbackLines)"
+            return "No encontré información específica sobre tu consulta en los documentos."
         }
 
         let header = "De **\(bestResult.documentTitle)**:"

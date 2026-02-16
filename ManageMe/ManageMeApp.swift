@@ -9,8 +9,13 @@ struct ManageMeApp: App {
         do {
             try DocumentRepository.ensureStorageDirectories()
         } catch {
-            AppLogger.error("Error creando directorios de almacenamiento: \(error.localizedDescription)")
+            print("Error creando directorios de almacenamiento: \(error.localizedDescription)")
             UserDefaults.standard.set(error.localizedDescription, forKey: "startup_storage_error")
+        }
+
+        // Start iCloud sync
+        if #available(iOS 17.0, *) {
+            SyncCoordinator.shared.start()
         }
     }
 
@@ -29,6 +34,12 @@ struct ManageMeApp: App {
             guard newPhase == .active else { return }
             Task {
                 await SharedInboxImporter.shared.importPendingFiles()
+            }
+            // Re-schedule pending sync changes when app becomes active
+            if #available(iOS 17.0, *) {
+                Task {
+                    await SyncCoordinator.shared.schedulePendingChanges()
+                }
             }
         }
     }

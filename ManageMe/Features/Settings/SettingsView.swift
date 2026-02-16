@@ -2,7 +2,6 @@ import SwiftUI
 
 struct SettingsView: View {
     @StateObject private var viewModel = SettingsViewModel()
-    @State private var showCloudKey = false
 
     var body: some View {
         NavigationStack {
@@ -34,39 +33,9 @@ struct SettingsView: View {
                     Text(viewModel.aiFooterText)
                 }
 
-                Section {
-                    VStack(alignment: .leading, spacing: 10) {
-                        if showCloudKey {
-                            TextField("sk-...", text: $viewModel.openAIAPIKey)
-                                .textInputAutocapitalization(.never)
-                                .disableAutocorrection(true)
-                        } else {
-                            SecureField("sk-...", text: $viewModel.openAIAPIKey)
-                                .textInputAutocapitalization(.never)
-                                .disableAutocorrection(true)
-                        }
-
-                        Toggle("Mostrar clave", isOn: $showCloudKey)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    HStack {
-                        Button("Guardar clave") {
-                            viewModel.saveOpenAIAPIKey()
-                        }
-                        .disabled(viewModel.openAIAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-
-                        Spacer()
-
-                        Button("Eliminar clave", role: .destructive) {
-                            viewModel.clearOpenAIAPIKey()
-                        }
-                    }
-                } header: {
-                    Text("Fallback OpenAI (opcional)")
-                } footer: {
-                    Text("La clave se guarda en el llavero del dispositivo.")
+                // iCloud Sync
+                if #available(iOS 17.0, *) {
+                    iCloudSyncSection
                 }
 
                 // Storage
@@ -157,6 +126,67 @@ struct SettingsView: View {
             } message: {
                 Text(viewModel.userErrorMessage ?? "Ha ocurrido un error.")
             }
+        }
+    }
+
+    // MARK: - iCloud Sync Section
+
+    @available(iOS 17.0, *)
+    private var iCloudSyncSection: some View {
+        Section {
+            HStack(spacing: 12) {
+                Image(systemName: "icloud")
+                    .font(.title3)
+                    .foregroundStyle(SyncCoordinator.shared.iCloudAvailable ? Color.appAccent : .secondary)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Sincronización iCloud")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+
+                    if SyncCoordinator.shared.isSyncing {
+                        HStack(spacing: 4) {
+                            ProgressView()
+                                .scaleEffect(0.7)
+                            Text("Sincronizando...")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    } else if let lastSync = SyncCoordinator.shared.lastSyncDate {
+                        Text("Última sync: \(lastSync, style: .relative) atrás")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else if SyncCoordinator.shared.iCloudAvailable {
+                        Text("Activa")
+                            .font(.caption)
+                            .foregroundStyle(Color.appSuccess)
+                    } else {
+                        Text("No disponible")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Spacer()
+
+                Image(systemName: SyncCoordinator.shared.iCloudAvailable ? "checkmark.circle.fill" : "xmark.circle")
+                    .foregroundStyle(SyncCoordinator.shared.iCloudAvailable ? Color.appSuccess : .secondary)
+            }
+
+            if let error = SyncCoordinator.shared.syncError {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                        .font(.caption)
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        } header: {
+            Text("iCloud")
+        } footer: {
+            Text("Documentos, carpetas y conversaciones se sincronizan automáticamente entre tus dispositivos.")
         }
     }
 }

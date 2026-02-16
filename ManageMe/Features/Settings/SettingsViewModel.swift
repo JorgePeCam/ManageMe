@@ -105,13 +105,25 @@ final class SettingsViewModel: ObservableObject {
     func deleteAllData() {
         Task {
             do {
+                // Delete all documents and files
                 let docs = try await repository.fetchAll()
                 for doc in docs {
                     try await repository.delete(id: doc.id)
                     repository.deleteFile(for: doc)
                 }
+
+                // Delete all conversations
+                let conversationRepo = ConversationRepository()
+                try await conversationRepo.deleteAllConversations()
+
+                // Clear thumbnail cache
+                await ThumbnailService.shared.clearCache()
+
                 documentCount = 0
                 storageUsed = "0 bytes"
+
+                // Notify other views to reset
+                NotificationCenter.default.post(name: .allDataDidDelete, object: nil)
             } catch {
                 AppLogger.error("Error borrando datos: \(error.localizedDescription)")
                 userErrorMessage = "No se pudieron borrar todos los datos."

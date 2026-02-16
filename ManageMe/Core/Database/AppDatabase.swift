@@ -134,6 +134,58 @@ final class AppDatabase {
             try db.create(index: "chatMessage_conversationId", on: "chatMessage", columns: ["conversationId"])
         }
 
+        // MARK: - iCloud Sync metadata
+
+        migrator.registerMigration("addSyncMetadata") { db in
+            // Add sync columns to document
+            try db.alter(table: "document") { t in
+                t.add(column: "syncChangeTag", .text)
+                t.add(column: "needsSyncPush", .boolean).defaults(to: true)
+                t.add(column: "modifiedAt", .datetime)
+            }
+
+            // Add sync columns to folder
+            try db.alter(table: "folder") { t in
+                t.add(column: "syncChangeTag", .text)
+                t.add(column: "needsSyncPush", .boolean).defaults(to: true)
+                t.add(column: "modifiedAt", .datetime)
+            }
+
+            // Add sync columns to conversation
+            try db.alter(table: "conversation") { t in
+                t.add(column: "syncChangeTag", .text)
+                t.add(column: "needsSyncPush", .boolean).defaults(to: true)
+                t.add(column: "modifiedAt", .datetime)
+            }
+
+            // Add sync columns to chatMessage
+            try db.alter(table: "chatMessage") { t in
+                t.add(column: "syncChangeTag", .text)
+                t.add(column: "needsSyncPush", .boolean).defaults(to: true)
+                t.add(column: "modifiedAt", .datetime)
+            }
+
+            // Pending deletions to push to CloudKit
+            try db.create(table: "pendingSyncDeletion") { t in
+                t.column("recordName", .text).notNull()
+                t.column("recordType", .text).notNull()
+                t.primaryKey(["recordName", "recordType"])
+            }
+
+            // Persistent state for CKSyncEngine
+            try db.create(table: "syncState") { t in
+                t.column("key", .text).primaryKey()
+                t.column("data", .blob).notNull()
+            }
+
+            // Mark all existing records as needing sync push
+            let now = Date().timeIntervalSinceReferenceDate
+            try db.execute(sql: "UPDATE document SET needsSyncPush = 1, modifiedAt = ?", arguments: [now])
+            try db.execute(sql: "UPDATE folder SET needsSyncPush = 1, modifiedAt = ?", arguments: [now])
+            try db.execute(sql: "UPDATE conversation SET needsSyncPush = 1, modifiedAt = ?", arguments: [now])
+            try db.execute(sql: "UPDATE chatMessage SET needsSyncPush = 1, modifiedAt = ?", arguments: [now])
+        }
+
         return migrator
     }
 }

@@ -67,6 +67,11 @@ struct Document: Identifiable, Codable, FetchableRecord, PersistableRecord {
     var errorMessage: String?
     var folderId: String?
 
+    // Sync metadata
+    var syncChangeTag: String?
+    var needsSyncPush: Bool
+    var modifiedAt: Date?
+
     init(
         id: String = UUID().uuidString,
         title: String,
@@ -79,7 +84,10 @@ struct Document: Identifiable, Codable, FetchableRecord, PersistableRecord {
         sourceType: SourceType = .files,
         processingStatus: ProcessingStatus = .pending,
         errorMessage: String? = nil,
-        folderId: String? = nil
+        folderId: String? = nil,
+        syncChangeTag: String? = nil,
+        needsSyncPush: Bool = true,
+        modifiedAt: Date? = Date()
     ) {
         self.id = id
         self.title = title
@@ -93,6 +101,9 @@ struct Document: Identifiable, Codable, FetchableRecord, PersistableRecord {
         self.processingStatus = processingStatus.rawValue
         self.errorMessage = errorMessage
         self.folderId = folderId
+        self.syncChangeTag = syncChangeTag
+        self.needsSyncPush = needsSyncPush
+        self.modifiedAt = modifiedAt
     }
 
     var fileTypeEnum: FileType {

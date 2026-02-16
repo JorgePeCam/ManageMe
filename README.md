@@ -23,7 +23,7 @@ ManageMe te permite:
 
 - Biblioteca con documentos y **carpetas** (crear, renombrar, borrar, navegar, mover documentos).
 - Importación desde archivos y cámara.
-- **Share Extension** para compartir PDFs e imágenes desde otras apps a ManageMe.
+- **Share Extension** para compartir archivos y contenido desde otras apps a ManageMe.
 - Procesamiento automático:
   - extracción de texto,
   - chunking,
@@ -38,7 +38,7 @@ ManageMe te permite:
   - fallback extractivo si falla IA.
 - Ajustes de mantenimiento:
   - estado de IA/proveedor activo,
-  - clave OpenAI opcional en llavero,
+  - estado de sincronización iCloud,
   - reindexado,
   - borrado total de datos.
 
@@ -68,6 +68,7 @@ ManageMe/
 │   ├── Models/          # Document, Folder, Chunk, Conversation...
 │   ├── Database/        # AppDatabase + repositorios
 │   ├── Services/        # Extracción, chunking, embeddings, QA
+│   ├── Sync/            # CKSyncEngine + mapeo CloudKit
 │   └── Theme.swift
 └── AI/                  # Tokenizer y recursos de modelos
 ```
@@ -78,6 +79,7 @@ Componentes clave:
 - `ChunkRepository`: búsqueda vectorial + FTS híbrida.
 - `FolderRepository`: operaciones de carpetas.
 - `QAService`: cadena de proveedores de respuesta.
+- `SyncCoordinator`: sincronización bidireccional con iCloud.
 
 ---
 
@@ -86,10 +88,23 @@ Componentes clave:
 `QAService` usa esta cadena de fallback:
 
 1. Apple Foundation Models (on-device), si está disponible.
-2. OpenAI (nube), si hay API key configurada.
-3. Respuesta extractiva local, como último recurso.
+2. Respuesta extractiva local, como último recurso.
 
-La API key de OpenAI se guarda en **Keychain** (llavero), no en texto plano.
+---
+
+## Sincronización iCloud
+
+ManageMe incluye sincronización bidireccional con CloudKit (base de datos privada del usuario):
+
+- sincroniza documentos, carpetas, conversaciones y mensajes,
+- mantiene una cola local de cambios pendientes,
+- reintenta envíos y descargas cuando la app vuelve a estar activa.
+
+Requisitos:
+
+- iOS 17 o superior,
+- sesión de iCloud activa en el dispositivo,
+- mismo Apple ID en los dispositivos a sincronizar.
 
 ---
 
@@ -100,7 +115,7 @@ ManageMe incluye una extensión de compartir para guardar contenido sin abrir la
 Flujo:
 
 1. Desde Safari, Mail, WhatsApp u otra app, usa Compartir -> `Guardar en ManageMe`.
-2. La extensión copia el archivo (PDF/imagen) a un inbox compartido (`App Group`).
+2. La extensión copia el contenido compartido a un inbox compartido (`App Group`).
 3. Al abrir/activar ManageMe, la app importa ese inbox y lanza su pipeline normal (extract -> chunk -> embeddings).
 
 ---

@@ -113,18 +113,44 @@ struct ChunkRepository {
         }
     }
 
+    /// Spanish + English stopwords to exclude from keyword searches
+    private static let stopwords: Set<String> = [
+        // Spanish
+        "que", "qué", "de", "del", "la", "el", "en", "es", "lo", "los", "las",
+        "un", "una", "uno", "por", "con", "para", "al", "se", "su", "sus",
+        "mi", "mis", "tu", "tus", "nos", "les", "como", "pero", "mas", "más",
+        "ya", "este", "esta", "ese", "esa", "hay", "fue", "son", "ser", "sin",
+        "sobre", "entre", "cuando", "muy", "puede", "donde", "tiene", "sido",
+        "desde", "está", "están", "era", "han", "todo", "otra", "otro",
+        "cual", "cuál", "aquí", "también", "cada", "nos", "porque",
+        // English
+        "the", "is", "at", "which", "on", "and", "or", "in", "to", "of",
+        "for", "with", "was", "are", "has", "have", "had", "not", "but",
+        "from", "this", "that", "these", "those", "what", "when", "where",
+        "how", "who", "why", "my", "your", "his", "her", "its", "our"
+    ]
+
     /// Converts user text into a valid FTS5 query.
-    /// Removes punctuation and joins words with OR for broader matching.
+    /// Removes punctuation, stopwords, and joins meaningful words with OR.
     static func sanitizeFTSQuery(_ query: String) -> String {
         let words = query
             .components(separatedBy: CharacterSet.alphanumerics.inverted)
             .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty && $0.count > 1 } // skip single-char words
+            .filter { !$0.isEmpty && $0.count > 1 }
+            .filter { !stopwords.contains($0.lowercased()) }
 
         guard !words.isEmpty else { return "" }
 
         // Wrap each word in quotes to avoid FTS5 syntax issues, join with OR
         return words.map { "\"\($0)\"" }.joined(separator: " OR ")
+    }
+
+    /// Returns meaningful words from a query (excluding stopwords)
+    static func meaningfulWords(from text: String) -> [String] {
+        text
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty && $0.count > 2 }
+            .filter { !stopwords.contains($0.lowercased()) }
     }
 
     // MARK: - Hybrid Search
@@ -133,17 +159,21 @@ struct ChunkRepository {
         queryVector: [Float],
         queryText: String,
         limit: Int = 5,
-        minScore: Float = 0.2
+        minScore: Float = 0.3
     ) async throws -> [SearchResult] {
         // Get vector results
         let vectorResults = try await searchByVector(
             queryVector: queryVector,
             limit: limit * 2,
-            minScore: minScore
+            minScore: 0.2
         )
 
-        // Get keyword results
+        // Get keyword results (already uses stopword-filtered query)
         let ftsResults = try await searchByKeywords(query: queryText, limit: limit * 2)
+
+        // Extract meaningful query words (no stopwords)
+        let meaningfulWords = Self.meaningfulWords(from: queryText)
+        let meaningfulWordsLower = Set(meaningfulWords.map { $0.lowercased() })
 
         // Merge: combine scores for chunks that appear in both
         var scoreMap: [String: (result: SearchResult, vectorScore: Float, ftsHit: Bool)] = [:]
@@ -161,11 +191,32 @@ struct ChunkRepository {
             }
         }
 
-        // Calculate final scores: 0.6 * semantic + 0.4 * keyword bonus
-        var merged: [SearchResult] = scoreMap.values.map { entry in
+        // Calculate final scores with meaningful keyword content matching
+        var merged: [SearchResult] = scoreMap.values.compactMap { entry in
             let semanticScore = entry.vectorScore
-            let keywordBonus: Float = entry.ftsHit ? 0.4 : 0.0
-            let finalScore = 0.6 * semanticScore + keywordBonus
+            let chunkLower = entry.result.chunkContent.lowercased()
+
+            // Count how many MEANINGFUL query words appear in the chunk
+            let matchingMeaningful = meaningfulWordsLower.filter { chunkLower.contains($0) }
+            let meaningfulRatio = meaningfulWordsLower.isEmpty
+                ? 0.0
+                : Float(matchingMeaningful.count) / Float(meaningfulWordsLower.count)
+
+            // FTS bonus only if meaningful words actually match in the content
+            let keywordBonus: Float
+            if entry.ftsHit && !matchingMeaningful.isEmpty {
+                keywordBonus = 0.15 + meaningfulRatio * 0.25 // 0.15–0.40 depending on word match ratio
+            } else {
+                keywordBonus = 0.0
+            }
+
+            // Direct content match bonus for each meaningful word found
+            let contentBonus: Float = min(Float(matchingMeaningful.count) * 0.1, 0.3)
+
+            let finalScore = 0.6 * semanticScore + keywordBonus + contentBonus
+
+            // Filter out truly irrelevant results
+            guard finalScore >= minScore else { return nil }
 
             return SearchResult(
                 id: entry.result.id,

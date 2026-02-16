@@ -11,19 +11,32 @@ struct DocumentRepository {
     // MARK: - CRUD
 
     func save(_ document: Document) async throws {
+        var doc = document
+        doc.needsSyncPush = true
+        doc.modifiedAt = Date()
         try await db.dbWriter.write { db in
-            try document.save(db)
+            try doc.save(db)
         }
     }
 
     func update(_ document: Document) async throws {
+        var doc = document
+        doc.needsSyncPush = true
+        doc.modifiedAt = Date()
         try await db.dbWriter.write { db in
-            try document.update(db)
+            try doc.update(db)
         }
     }
 
     func delete(id: String) async throws {
         try await db.dbWriter.write { db in
+            // Record pending deletion for CloudKit sync
+            if let doc = try Document.fetchOne(db, key: id) {
+                try db.execute(
+                    sql: "INSERT OR REPLACE INTO pendingSyncDeletion (recordName, recordType) VALUES (?, ?)",
+                    arguments: [doc.id, "MM_Document"]
+                )
+            }
             _ = try Document.deleteOne(db, key: id)
         }
     }
@@ -158,6 +171,32 @@ struct DocumentRepository {
 
         if let thumbURL = document.absoluteThumbnailURL {
             try? FileManager.default.removeItem(at: thumbURL)
+        }
+    }
+
+    // MARK: - Sync
+
+    func fetchPendingSyncPush() async throws -> [Document] {
+        try await db.dbWriter.read { db in
+            try Document
+                .filter(Column("needsSyncPush") == true)
+                .fetchAll(db)
+        }
+    }
+
+    func markSynced(id: String, changeTag: String) async throws {
+        try await db.dbWriter.write { db in
+            try db.execute(
+                sql: "UPDATE document SET needsSyncPush = 0, syncChangeTag = ? WHERE id = ?",
+                arguments: [changeTag, id]
+            )
+        }
+    }
+
+    /// Save a document coming from CloudKit (skip setting needsSyncPush)
+    func saveFromSync(_ document: Document) async throws {
+        try await db.dbWriter.write { db in
+            try document.save(db)
         }
     }
 }
