@@ -138,17 +138,6 @@ final class SharedInboxImporter {
 
     private static func cleanTitle(from url: URL) -> String {
         let raw = url.deletingPathExtension().lastPathComponent
-        let withoutPrefix = raw.replacingOccurrences(
-            of: "^(?:[A-Fa-f0-9-]{36}-)+",
-            with: "",
-            options: .regularExpression
-        )
-
-        let normalized = withoutPrefix
-            .replacingOccurrences(of: "_", with: " ")
-            .replacingOccurrences(of: "-", with: " ")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-
-        return normalized.isEmpty ? "Documento compartido" : normalized
+        return LibraryViewModel.cleanDocumentTitle(raw)
     }
 }

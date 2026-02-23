@@ -50,4 +50,5 @@ struct SearchResult: Identifiable {
     var documentId: String
     var documentTitle: String
     var score: Float
+    var chunkIndex: Int? = nil
 }

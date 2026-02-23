@@ -6,14 +6,12 @@ final class SettingsViewModel: ObservableObject {
     @Published var documentCount = 0
     @Published var storageUsed = "Calculando..."
     @Published var showDeleteConfirmation = false
-    @Published var openAIAPIKey = ""
     @Published var userErrorMessage: String?
 
     private let repository = DocumentRepository()
 
     init() {
         APIKeyStore.migrateLegacyUserDefaultsKeyIfNeeded()
-        openAIAPIKey = APIKeyStore.loadOpenAIKey()
     }
 
     var embeddingModelStatus: String {
@@ -35,11 +33,11 @@ final class SettingsViewModel: ObservableObject {
     var aiStatusText: String {
         switch QAService.shared.activeProviderKind {
         case .onDevice:
-            return "Activo — on-device"
+            return "Activo — en tu dispositivo"
         case .cloud:
-            return "Activo — nube (OpenAI)"
+            return "Activo — asistente inteligente"
         case nil:
-            return "No disponible"
+            return "Modo básico"
         }
     }
 
@@ -48,29 +46,9 @@ final class SettingsViewModel: ObservableObject {
         case .onDevice:
             return "Las respuestas se procesan en tu dispositivo. Privado y sin coste."
         case .cloud:
-            return "Las respuestas se procesan en la nube (OpenAI). Requiere conexión."
+            return "Las respuestas se generan con inteligencia artificial. Requiere conexión a internet."
         case nil:
-            return "Activa Apple Intelligence o configura una API key de OpenAI para fallback en la nube."
-        }
-    }
-
-    func saveOpenAIAPIKey() {
-        do {
-            try APIKeyStore.saveOpenAIKey(openAIAPIKey)
-            openAIAPIKey = APIKeyStore.loadOpenAIKey()
-        } catch {
-            AppLogger.error("Error guardando API key en llavero: \(error.localizedDescription)")
-            userErrorMessage = "No se pudo guardar la API key en el llavero."
-        }
-    }
-
-    func clearOpenAIAPIKey() {
-        do {
-            try APIKeyStore.deleteOpenAIKey()
-            openAIAPIKey = ""
-        } catch {
-            AppLogger.error("Error eliminando API key del llavero: \(error.localizedDescription)")
-            userErrorMessage = "No se pudo eliminar la API key del llavero."
+            return "Las respuestas se extraen directamente de tus documentos."
         }
     }
 

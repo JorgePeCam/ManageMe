@@ -7,13 +7,18 @@ struct ChatView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
+            Group {
                 if viewModel.messages.isEmpty && viewModel.currentConversation == nil {
-                    emptyState
+                    ScrollView {
+                        emptyState
+                    }
+                    .scrollDismissesKeyboard(.interactively)
+                    .onTapGesture { isInputFocused = false }
                 } else {
                     messageList
                 }
-
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
                 inputBar
             }
             .background(Color.appCardSecondary)
@@ -47,20 +52,19 @@ struct ChatView: View {
     // MARK: - Empty State
 
     private var emptyState: some View {
-        VStack(spacing: 28) {
-            Spacer()
-
+        VStack(spacing: 24) {
             ZStack {
                 Circle()
                     .fill(LinearGradient.accentSoftGradient)
-                    .frame(width: 100, height: 100)
+                    .frame(width: 80, height: 80)
 
                 Image(systemName: "sparkles")
-                    .font(.system(size: 40, weight: .light))
+                    .font(.system(size: 32, weight: .light))
                     .foregroundStyle(Color.appAccent)
             }
+            .padding(.top, 32)
 
-            VStack(spacing: 8) {
+            VStack(spacing: 6) {
                 Text("Pregunta lo que quieras")
                     .font(.title3)
                     .fontWeight(.bold)
@@ -81,8 +85,6 @@ struct ChatView: View {
             if !viewModel.conversations.isEmpty {
                 recentConversations
             }
-
-            Spacer()
         }
         .padding(AppStyle.paddingLarge)
     }
@@ -182,6 +184,10 @@ struct ChatView: View {
                     }
                 }
                 .padding()
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .onTapGesture {
+                isInputFocused = false
             }
             .onChange(of: viewModel.messages.count) {
                 if let last = viewModel.messages.last {

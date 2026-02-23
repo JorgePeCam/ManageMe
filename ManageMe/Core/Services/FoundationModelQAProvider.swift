@@ -20,15 +20,14 @@ final class FoundationModelQAProvider: StreamableQAProvider {
 
     func answer(query: String, context: [SearchResult]) async throws -> String {
         #if canImport(FoundationModels)
-        // Try with full context first, retry with less if it fails
+        // Try with richer context first, then progressively reduce if needed.
         do {
-            return try await generate(query: query, context: context, maxChunks: 2, maxChars: 300)
+            return try await generate(query: query, context: context, maxChunks: 10, maxChars: 1500)
         } catch {
-            // Retry with minimal context
             do {
-                return try await generate(query: query, context: context, maxChunks: 1, maxChars: 200)
+                return try await generate(query: query, context: context, maxChunks: 6, maxChars: 1200)
             } catch {
-                throw error
+                return try await generate(query: query, context: context, maxChunks: 3, maxChars: 800)
             }
         }
         #else
@@ -38,7 +37,7 @@ final class FoundationModelQAProvider: StreamableQAProvider {
 
     func streamAnswer(query: String, context: [SearchResult], onUpdate: @escaping (String) -> Void) async throws {
         #if canImport(FoundationModels)
-        let prompt = buildPrompt(query: query, context: context, maxChunks: 2, maxChars: 300)
+        let prompt = buildPrompt(query: query, context: context, maxChunks: 10, maxChars: 1500)
         let session = LanguageModelSession(instructions: Self.instructions)
 
         do {
@@ -67,16 +66,39 @@ final class FoundationModelQAProvider: StreamableQAProvider {
     }
     #endif
 
-    private static let instructions = "Answer concisely using only the provided text. Same language as the question."
+    private static let instructions = """
+    You are a document QA assistant. You answer questions based ONLY on the provided document snippets.
+
+    RULES:
+    1. ONLY use facts that are EXPLICITLY written in the snippets.
+    2. If NONE of the snippets contain relevant information, reply EXACTLY: "No encontré información sobre esto en tus documentos."
+    3. NEVER invent or guess information not in the snippets.
+    4. NEVER use general knowledge — only cite what is written.
+    5. If a snippet is about a different topic than the question, IGNORE it.
+    6. Respond in the same language as the question.
+
+    RESPONSE STYLE:
+    - Give DETAILED, thorough answers. Include all relevant data you find: dates, names, technologies, responsibilities, amounts, locations, etc.
+    - If information is spread across multiple snippets from the same document, synthesize it into one coherent, complete answer.
+    - Use paragraphs, bullet points, or sections to organize the information clearly.
+    - Do NOT give one-line answers when the snippets contain more detail. Elaborate fully.
+    - Cite the document name when relevant.
+    """
 
     private func buildPrompt(query: String, context: [SearchResult], maxChunks: Int, maxChars: Int) -> String {
         let chunks = context.prefix(maxChunks)
-        var prompt = ""
-        for result in chunks {
+        var prompt = "FRAGMENTOS DE DOCUMENTOS DEL USUARIO:\n\n"
+        for (idx, result) in chunks.enumerated() {
             let text = String(result.chunkContent.prefix(maxChars))
-            prompt += "\(text)\n\n"
+            prompt += "[\(idx + 1)] Documento: \"\(result.documentTitle)\"\n\(text)\n\n"
         }
-        prompt += "Q: \(query)"
+        prompt += """
+        PREGUNTA DEL USUARIO: \(query)
+
+        INSTRUCCIONES: Responde con DETALLE usando toda la información relevante de los fragmentos. Si hay datos distribuidos en varios fragmentos del mismo documento, sintetízalos en una respuesta completa. Si los fragmentos NO contienen información relevante, responde "No encontré información sobre esto en tus documentos."
+
+        RESPUESTA:
+        """
         return prompt
     }
 }

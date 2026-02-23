@@ -189,9 +189,7 @@ final class LibraryViewModel: ObservableObject {
 
         do {
             let (relativePath, fileSize) = try repository.importFile(from: url, fileType: fileType)
-            let cleanTitle = title
-                .replacingOccurrences(of: "_", with: " ")
-                .replacingOccurrences(of: "-", with: " ")
+            let cleanTitle = Self.cleanDocumentTitle(title)
 
             let document = Document(
                 title: cleanTitle,
@@ -214,6 +212,52 @@ final class LibraryViewModel: ObservableObject {
             AppLogger.error("Error importando archivo: \(error.localizedDescription)")
             userErrorMessage = "No se pudo guardar el archivo importado."
         }
+    }
+
+    /// Cleans a filename into a human-readable document title.
+    /// Removes hex hashes, UUIDs, Base64 tokens, underscores, and hyphens.
+    static func cleanDocumentTitle(_ raw: String) -> String {
+        var title = raw
+
+        // Remove leading UUID prefixes (with or without trailing separator)
+        title = title.replacingOccurrences(
+            of: "^(?:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}[_ -]?)+",
+            with: "",
+            options: .regularExpression
+        )
+
+        // Remove leading hex hashes (16+ hex chars) like MD5, SHA fragments
+        title = title.replacingOccurrences(
+            of: "^[A-Fa-f0-9]{16,}[_ -]?",
+            with: "",
+            options: .regularExpression
+        )
+
+        // Remove trailing Base64-like tokens (12+ alphanumeric chars at end)
+        title = title.replacingOccurrences(
+            of: "[_ -][A-Za-z0-9+/]{12,}=*$",
+            with: "",
+            options: .regularExpression
+        )
+        // Also remove space-separated Base64/hash tokens at the end
+        title = title.replacingOccurrences(
+            of: "\\s+[A-Za-z0-9]{12,}$",
+            with: "",
+            options: .regularExpression
+        )
+
+        // Clean separators
+        title = title
+            .replacingOccurrences(of: "_", with: " ")
+            .replacingOccurrences(of: "-", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Collapse multiple spaces
+        while title.contains("  ") {
+            title = title.replacingOccurrences(of: "  ", with: " ")
+        }
+
+        return title.isEmpty ? "Documento importado" : title
     }
 
     private func importCameraImage(_ image: UIImage) async {

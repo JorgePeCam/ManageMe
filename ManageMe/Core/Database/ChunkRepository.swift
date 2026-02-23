@@ -50,7 +50,7 @@ struct ChunkRepository {
     func searchByVector(queryVector: [Float], limit: Int = 5, minScore: Float = 0.25) async throws -> [SearchResult] {
         try await db.dbWriter.read { db in
             let rows = try Row.fetchAll(db, sql: """
-                SELECT c.id, c.content, c.documentId, d.title, v.embedding
+                SELECT c.id, c.content, c.documentId, c.chunkIndex, d.title, v.embedding
                 FROM documentChunk c
                 JOIN chunkVector v ON c.id = v.chunkId
                 JOIN document d ON c.documentId = d.id
@@ -69,7 +69,8 @@ struct ChunkRepository {
                         chunkContent: row["content"],
                         documentId: row["documentId"],
                         documentTitle: row["title"],
-                        score: score
+                        score: score,
+                        chunkIndex: row["chunkIndex"]
                     ))
                 }
             }
@@ -84,22 +85,18 @@ struct ChunkRepository {
     // MARK: - FTS Search
 
     func searchByKeywords(query: String, limit: Int = 5) async throws -> [SearchResult] {
-        // Sanitize query for FTS5: remove special characters, keep only words
-        let sanitized = Self.sanitizeFTSQuery(query)
-        guard !sanitized.isEmpty else { return [] }
+        let terms = Self.ftsTerms(from: query)
+        guard !terms.isEmpty else { return [] }
 
         return try await db.dbWriter.read { db in
-            let rows = try Row.fetchAll(db, sql: """
-                SELECT c.id, c.content, c.documentId, d.title,
-                       rank AS ftsScore
-                FROM documentChunk_fts fts
-                JOIN documentChunk c ON c.rowid = fts.rowid
-                JOIN document d ON c.documentId = d.id
-                WHERE documentChunk_fts MATCH ?
-                AND d.processingStatus = 'ready'
-                ORDER BY rank
-                LIMIT ?
-            """, arguments: [sanitized, limit])
+            let strictQuery = Self.buildFTSQuery(from: terms, useOR: false)
+            var rows = try Self.executeFTSQuery(strictQuery, limit: limit, in: db)
+
+            // If strict matching is too restrictive, fallback to OR for recall.
+            if rows.isEmpty && terms.count > 1 {
+                let relaxedQuery = Self.buildFTSQuery(from: terms, useOR: true)
+                rows = try Self.executeFTSQuery(relaxedQuery, limit: limit, in: db)
+            }
 
             return rows.map { row in
                 SearchResult(
@@ -107,14 +104,15 @@ struct ChunkRepository {
                     chunkContent: row["content"],
                     documentId: row["documentId"],
                     documentTitle: row["title"],
-                    score: 1.0
+                    score: 1.0,
+                    chunkIndex: row["chunkIndex"]
                 )
             }
         }
     }
 
     /// Spanish + English stopwords to exclude from keyword searches
-    private static let stopwords: Set<String> = [
+    nonisolated private static let stopwords: Set<String> = [
         // Spanish
         "que", "qué", "de", "del", "la", "el", "en", "es", "lo", "los", "las",
         "un", "una", "uno", "por", "con", "para", "al", "se", "su", "sus",
@@ -132,25 +130,61 @@ struct ChunkRepository {
 
     /// Converts user text into a valid FTS5 query.
     /// Removes punctuation, stopwords, and joins meaningful words with OR.
-    static func sanitizeFTSQuery(_ query: String) -> String {
-        let words = query
-            .components(separatedBy: CharacterSet.alphanumerics.inverted)
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty && $0.count > 1 }
-            .filter { !stopwords.contains($0.lowercased()) }
+    nonisolated static func sanitizeFTSQuery(_ query: String) -> String {
+        let words = ftsTerms(from: query)
 
         guard !words.isEmpty else { return "" }
 
-        // Wrap each word in quotes to avoid FTS5 syntax issues, join with OR
+        // Keep legacy behavior for callers that still use this utility directly.
         return words.map { "\"\($0)\"" }.joined(separator: " OR ")
     }
 
     /// Returns meaningful words from a query (excluding stopwords)
-    static func meaningfulWords(from text: String) -> [String] {
+    nonisolated static func meaningfulWords(from text: String) -> [String] {
         text
             .components(separatedBy: CharacterSet.alphanumerics.inverted)
             .filter { !$0.isEmpty && $0.count > 2 }
             .filter { !stopwords.contains($0.lowercased()) }
+    }
+
+    nonisolated private static func normalize(_ text: String) -> String {
+        text.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+    }
+
+    nonisolated private static func tokenSet(from text: String) -> Set<String> {
+        Set(
+            normalize(text)
+                .components(separatedBy: CharacterSet.alphanumerics.inverted)
+                .filter { !$0.isEmpty && $0.count > 1 }
+        )
+    }
+
+    nonisolated private static func ftsTerms(from query: String) -> [String] {
+        query
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty && $0.count > 1 }
+            .filter { !stopwords.contains($0.lowercased()) }
+    }
+
+    nonisolated private static func buildFTSQuery(from terms: [String], useOR: Bool) -> String {
+        guard !terms.isEmpty else { return "" }
+        let separator = useOR ? " OR " : " AND "
+        return terms.map { "\"\($0)\"" }.joined(separator: separator)
+    }
+
+    nonisolated private static func executeFTSQuery(_ query: String, limit: Int, in db: Database) throws -> [Row] {
+        try Row.fetchAll(db, sql: """
+            SELECT c.id, c.content, c.documentId, c.chunkIndex, d.title,
+                   rank AS ftsScore
+            FROM documentChunk_fts fts
+            JOIN documentChunk c ON c.rowid = fts.rowid
+            JOIN document d ON c.documentId = d.id
+            WHERE documentChunk_fts MATCH ?
+            AND d.processingStatus = 'ready'
+            ORDER BY rank
+            LIMIT ?
+        """, arguments: [query, limit])
     }
 
     // MARK: - Hybrid Search
@@ -161,19 +195,53 @@ struct ChunkRepository {
         limit: Int = 5,
         minScore: Float = 0.3
     ) async throws -> [SearchResult] {
-        // Get vector results
+        // Get vector results (lower threshold to let lexical matching boost good results)
         let vectorResults = try await searchByVector(
             queryVector: queryVector,
-            limit: limit * 2,
-            minScore: 0.2
+            limit: limit * 3,
+            minScore: 0.15
         )
 
         // Get keyword results (already uses stopword-filtered query)
-        let ftsResults = try await searchByKeywords(query: queryText, limit: limit * 2)
+        let ftsResults = try await searchByKeywords(query: queryText, limit: limit * 3)
+
+        print("[HybridSearch] vector=\(vectorResults.count) fts=\(ftsResults.count) query=\"\(queryText)\"")
 
         // Extract meaningful query words (no stopwords)
         let meaningfulWords = Self.meaningfulWords(from: queryText)
-        let meaningfulWordsLower = Set(meaningfulWords.map { $0.lowercased() })
+        let normalizedMeaningful = Set(meaningfulWords.map(Self.normalize))
+
+        // Detect entity terms: words that are likely names, companies, places, etc.
+        // These deserve a big scoring boost when found in a chunk.
+        let originalWords = queryText
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { $0.count > 2 }
+        let intentVerbs: Set<String> = [
+            // Verbs and generic question words — NOT entity names
+            "hice", "hago", "hacer", "trabaje", "trabajo", "trabajar", "trabajando",
+            "tuve", "tengo", "tener", "fui", "fue", "ser", "estar", "estuve",
+            "dije", "decir", "puse", "poner", "hizo", "haciendo", "hace",
+            "cual", "como", "donde", "cuando", "cuanto", "cuantos", "cuantas",
+            "labor", "experiencia", "puesto", "cargo", "funcion",
+            // Generic nouns that cause false matches
+            "tiempo", "dia", "dias", "mes", "meses", "ano", "anos", "hoy", "ayer",
+            "cosa", "cosas", "parte", "partes", "tipo", "tipos", "forma", "manera",
+            "vez", "veces", "algo", "nada", "mucho", "poco", "bien", "mal",
+            "nombre", "numero", "fecha", "datos", "informacion", "documento",
+            "precio", "pago", "dinero", "valor", "total", "cuenta",
+            // Weather / non-document queries
+            "clima", "lluvia", "sol", "temperatura", "grados", "calor", "frio"
+        ]
+        let entityTerms = Set(
+            originalWords
+                .filter { word in
+                    let normalized = Self.normalize(word)
+                    if ChunkRepository.stopwords.contains(normalized) { return false }
+                    if intentVerbs.contains(normalized) { return false }
+                    return true
+                }
+                .map(Self.normalize)
+        )
 
         // Merge: combine scores for chunks that appear in both
         var scoreMap: [String: (result: SearchResult, vectorScore: Float, ftsHit: Bool)] = [:]
@@ -194,26 +262,38 @@ struct ChunkRepository {
         // Calculate final scores with meaningful keyword content matching
         var merged: [SearchResult] = scoreMap.values.compactMap { entry in
             let semanticScore = entry.vectorScore
-            let chunkLower = entry.result.chunkContent.lowercased()
-
-            // Count how many MEANINGFUL query words appear in the chunk
-            let matchingMeaningful = meaningfulWordsLower.filter { chunkLower.contains($0) }
-            let meaningfulRatio = meaningfulWordsLower.isEmpty
+            let chunkTokens = Self.tokenSet(from: entry.result.chunkContent)
+            let titleTokens = Self.tokenSet(from: entry.result.documentTitle)
+            let searchableTokens = chunkTokens.union(titleTokens)
+            let lexicalMatches = normalizedMeaningful.intersection(searchableTokens)
+            let lexicalCoverage = normalizedMeaningful.isEmpty
                 ? 0.0
-                : Float(matchingMeaningful.count) / Float(meaningfulWordsLower.count)
+                : Float(lexicalMatches.count) / Float(normalizedMeaningful.count)
 
-            // FTS bonus only if meaningful words actually match in the content
+            // Check if any proper noun from the query appears in this chunk
+            let hasEntityMatch = !entityTerms.isEmpty && !entityTerms.isDisjoint(with: searchableTokens)
+
+            // Reject pure semantic matches that don't contain ANY meaningful query term
+            // UNLESS the semantic score is very high OR a proper noun matches
+            if !normalizedMeaningful.isEmpty && lexicalMatches.isEmpty && !hasEntityMatch && semanticScore < 0.72 {
+                return nil
+            }
+
+            // Keyword bonus
             let keywordBonus: Float
-            if entry.ftsHit && !matchingMeaningful.isEmpty {
-                keywordBonus = 0.15 + meaningfulRatio * 0.25 // 0.15–0.40 depending on word match ratio
+            if entry.ftsHit && !lexicalMatches.isEmpty {
+                keywordBonus = 0.05 + lexicalCoverage * 0.10
+            } else if !lexicalMatches.isEmpty {
+                keywordBonus = lexicalCoverage * 0.05
             } else {
                 keywordBonus = 0.0
             }
 
-            // Direct content match bonus for each meaningful word found
-            let contentBonus: Float = min(Float(matchingMeaningful.count) * 0.1, 0.3)
+            // Entity bonus: if a specific name/entity matches, it's very likely relevant
+            let entityBonus: Float = hasEntityMatch ? 0.25 : 0.0
 
-            let finalScore = 0.6 * semanticScore + keywordBonus + contentBonus
+            // Score formula: semantic + lexical + keyword + entity
+            let finalScore = 0.45 * semanticScore + 0.30 * lexicalCoverage + keywordBonus + entityBonus
 
             // Filter out truly irrelevant results
             guard finalScore >= minScore else { return nil }
@@ -223,11 +303,19 @@ struct ChunkRepository {
                 chunkContent: entry.result.chunkContent,
                 documentId: entry.result.documentId,
                 documentTitle: entry.result.documentTitle,
-                score: finalScore
+                score: finalScore,
+                chunkIndex: entry.result.chunkIndex
             )
         }
 
         merged.sort { $0.score > $1.score }
+
+        print("[HybridSearch] entityTerms=\(entityTerms) meaningful=\(normalizedMeaningful)")
+        print("[HybridSearch] merged=\(merged.count) results (limit=\(limit))")
+        for (i, r) in merged.prefix(5).enumerated() {
+            print("[HybridSearch]   [\(i)] score=\(String(format: "%.3f", r.score)) doc=\"\(r.documentTitle)\" chunk=\(r.chunkIndex ?? -1)")
+        }
+
         return Array(merged.prefix(limit))
     }
 }

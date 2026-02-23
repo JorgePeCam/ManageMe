@@ -19,8 +19,8 @@ enum QAProviderKind {
 }
 
 /// Orchestrates Q&A with automatic fallback chain:
-/// 1. Apple Intelligence (on-device, free) — iOS 26+
-/// 2. OpenAI GPT-4o-mini (cloud, fast) — silent fallback
+/// 1. Gemini Flash (cloud, free) — best quality, primary
+/// 2. Apple Intelligence (on-device, free) — offline/rate-limit fallback
 /// 3. Extractive (no LLM) — last resort, handled by ChatViewModel
 final class QAService {
     static let shared = QAService()
@@ -28,13 +28,13 @@ final class QAService {
     private var providers: [QAProvider] = []
 
     private init() {
-        // 1. Apple Foundation Models — free, private, on-device
+        // 1. Gemini Flash — best quality, free tier (20 queries/day per device)
+        providers.append(GeminiQAProvider())
+
+        // 2. Apple Foundation Models — fallback when offline or Gemini limit reached
         if #available(iOS 26, macOS 26, *) {
             providers.append(FoundationModelQAProvider())
         }
-
-        // 2. OpenAI — silent cloud fallback
-        providers.append(OpenAIQAProvider())
     }
 
     /// Returns the first available provider, or nil
@@ -63,10 +63,15 @@ final class QAService {
     func answer(query: String, context: [SearchResult]) async throws -> String {
         var lastError: Error?
 
+        print("[QAService] Providers: \(providers.map { "\($0.name) available=\($0.isAvailable)" })")
         for provider in providers where provider.isAvailable {
             do {
-                return try await provider.answer(query: query, context: context)
+                print("[QAService] Trying provider: \(provider.name)")
+                let result = try await provider.answer(query: query, context: context)
+                print("[QAService] ✅ \(provider.name) succeeded")
+                return result
             } catch {
+                print("[QAService] ⚠️ \(provider.name) failed: \(error.localizedDescription)")
                 lastError = error
                 continue // Try next provider
             }
@@ -79,16 +84,20 @@ final class QAService {
     func streamAnswer(query: String, context: [SearchResult], onUpdate: @escaping (String) -> Void) async throws {
         var lastError: Error?
 
+        print("[QAService] Stream — Providers: \(providers.map { "\($0.name) available=\($0.isAvailable)" })")
         for provider in providers where provider.isAvailable {
             do {
+                print("[QAService] Stream — Trying: \(provider.name)")
                 if let streamable = provider as? StreamableQAProvider {
                     try await streamable.streamAnswer(query: query, context: context, onUpdate: onUpdate)
                 } else {
                     let result = try await provider.answer(query: query, context: context)
                     onUpdate(result)
                 }
+                print("[QAService] ✅ Stream — \(provider.name) succeeded")
                 return // Success
             } catch {
+                print("[QAService] ⚠️ Stream — \(provider.name) failed: \(error.localizedDescription)")
                 lastError = error
                 continue // Try next provider
             }
@@ -102,14 +111,18 @@ final class QAService {
         var prompt = """
         Eres un asistente personal que responde preguntas basándose ÚNICAMENTE en los documentos del usuario.
 
-        REGLAS ESTRICTAS:
-        - Responde SOLO con información que aparezca EXPLÍCITAMENTE en los fragmentos proporcionados
-        - Si los fragmentos NO contienen información relevante para la pregunta, responde EXACTAMENTE: "No encontré información sobre esto en tus documentos."
-        - NO inventes, deduzcas ni supongas información que no esté escrita en los fragmentos
-        - Responde de forma concisa y directa
-        - Usa formato claro: fechas, horas, lugares en líneas separadas
-        - Responde en el mismo idioma que la pregunta
-        - Cita el nombre del documento cuando sea relevante
+        REGLAS:
+        - Responde SOLO con información que aparezca en los fragmentos proporcionados.
+        - Si los fragmentos NO contienen información relevante, responde EXACTAMENTE: "No encontré información sobre esto en tus documentos."
+        - NO inventes ni supongas información que no esté en los fragmentos.
+        - Responde en el mismo idioma que la pregunta.
+        - Cita el nombre del documento cuando sea relevante.
+
+        ESTILO DE RESPUESTA:
+        - Desarrolla la respuesta con detalle: incluye todos los datos relevantes que encuentres (fechas, nombres, tecnologías, responsabilidades, cantidades, etc.)
+        - Organiza la información de forma clara usando párrafos, listas o secciones según convenga.
+        - Si hay información distribuida en varios fragmentos del mismo documento, sintetízala en una respuesta coherente y completa.
+        - No te limites a una línea; elabora una respuesta completa que responda la pregunta del usuario a fondo.
 
         FRAGMENTOS DE DOCUMENTOS:
         """
