@@ -205,7 +205,7 @@ struct ChunkRepository {
         // Get keyword results (already uses stopword-filtered query)
         let ftsResults = try await searchByKeywords(query: queryText, limit: limit * 3)
 
-        print("[HybridSearch] vector=\(vectorResults.count) fts=\(ftsResults.count) query=\"\(queryText)\"")
+        AppLogger.debug("[HybridSearch] vector=\(vectorResults.count) fts=\(ftsResults.count) query=\"\(queryText)\"")
 
         // Extract meaningful query words (no stopwords)
         let meaningfulWords = Self.meaningfulWords(from: queryText)
@@ -221,14 +221,19 @@ struct ChunkRepository {
             "hice", "hago", "hacer", "trabaje", "trabajo", "trabajar", "trabajando",
             "tuve", "tengo", "tener", "fui", "fue", "ser", "estar", "estuve",
             "dije", "decir", "puse", "poner", "hizo", "haciendo", "hace",
-            "cual", "como", "donde", "cuando", "cuanto", "cuantos", "cuantas",
+            "cual", "como", "donde", "cuando", "cuanto", "cuantos", "cuantas", "cuanta",
+            "puedo", "puede", "podria", "quiero", "necesito",
             "labor", "experiencia", "puesto", "cargo", "funcion",
             // Generic nouns that cause false matches
             "tiempo", "dia", "dias", "mes", "meses", "ano", "anos", "hoy", "ayer",
+            "semana", "semanas", "pasado", "pasada", "anterior", "ultimo", "ultima",
             "cosa", "cosas", "parte", "partes", "tipo", "tipos", "forma", "manera",
             "vez", "veces", "algo", "nada", "mucho", "poco", "bien", "mal",
             "nombre", "numero", "fecha", "datos", "informacion", "documento",
-            "precio", "pago", "dinero", "valor", "total", "cuenta",
+            "precio", "pago", "pague", "dinero", "valor", "total", "cuenta",
+            "gasto", "gastos", "gaste", "factura", "recibo", "coste", "costo",
+            // Utilities — generic, not proper nouns
+            "luz", "agua", "gas", "electricidad", "telefono", "internet", "alquiler",
             // Weather / non-document queries
             "clima", "lluvia", "sol", "temperatura", "grados", "calor", "frio"
         ]
@@ -310,10 +315,10 @@ struct ChunkRepository {
 
         merged.sort { $0.score > $1.score }
 
-        print("[HybridSearch] entityTerms=\(entityTerms) meaningful=\(normalizedMeaningful)")
-        print("[HybridSearch] merged=\(merged.count) results (limit=\(limit))")
+        AppLogger.debug("[HybridSearch] entityTerms=\(entityTerms) meaningful=\(normalizedMeaningful)")
+        AppLogger.debug("[HybridSearch] merged=\(merged.count) results (limit=\(limit))")
         for (i, r) in merged.prefix(5).enumerated() {
-            print("[HybridSearch]   [\(i)] score=\(String(format: "%.3f", r.score)) doc=\"\(r.documentTitle)\" chunk=\(r.chunkIndex ?? -1)")
+            AppLogger.debug("[HybridSearch]   [\(i)] score=\(String(format: "%.3f", r.score)) doc=\"\(r.documentTitle)\" chunk=\(r.chunkIndex ?? -1)")
         }
 
         return Array(merged.prefix(limit))

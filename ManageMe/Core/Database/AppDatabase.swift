@@ -186,6 +186,84 @@ final class AppDatabase {
             try db.execute(sql: "UPDATE chatMessage SET needsSyncPush = 1, modifiedAt = ?", arguments: [now])
         }
 
+        // MARK: - Clean up document titles (remove hashes, UUIDs, Base64)
+
+        migrator.registerMigration("cleanupDocumentTitles") { db in
+            let rows = try Row.fetchAll(db, sql: "SELECT id, title FROM document")
+            for row in rows {
+                let id: String = row["id"]
+                let rawTitle: String = row["title"]
+                let cleaned = Self.cleanTitle(rawTitle)
+                if cleaned != rawTitle {
+                    try db.execute(
+                        sql: "UPDATE document SET title = ?, needsSyncPush = 1 WHERE id = ?",
+                        arguments: [cleaned, id]
+                    )
+                }
+            }
+        }
+
+        // MARK: - Re-clean titles with improved regex (booking codes like J3ZN2TEN6)
+
+        migrator.registerMigration("cleanupDocumentTitlesV2") { db in
+            let rows = try Row.fetchAll(db, sql: "SELECT id, title FROM document")
+            for row in rows {
+                let id: String = row["id"]
+                let rawTitle: String = row["title"]
+                let cleaned = Self.cleanTitle(rawTitle)
+                if cleaned != rawTitle {
+                    try db.execute(
+                        sql: "UPDATE document SET title = ?, needsSyncPush = 1 WHERE id = ?",
+                        arguments: [cleaned, id]
+                    )
+                }
+            }
+        }
+
         return migrator
+    }
+
+    /// Clean a document title by removing hex hashes, UUIDs, and Base64 tokens.
+    /// Mirrors LibraryViewModel.cleanDocumentTitle but available at DB level.
+    private static func cleanTitle(_ raw: String) -> String {
+        var title = raw
+
+        // Remove leading UUIDs
+        title = title.replacingOccurrences(
+            of: "^(?:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}[_ -]?)+",
+            with: "", options: .regularExpression
+        )
+        // Remove leading hex hashes (16+ chars)
+        title = title.replacingOccurrences(
+            of: "^[A-Fa-f0-9]{16,}[_ -]?",
+            with: "", options: .regularExpression
+        )
+        // Remove trailing Base64-like tokens
+        title = title.replacingOccurrences(
+            of: "[_ -][A-Za-z0-9+/]{12,}=*$",
+            with: "", options: .regularExpression
+        )
+        title = title.replacingOccurrences(
+            of: "\\s+[A-Za-z0-9]{12,}$",
+            with: "", options: .regularExpression
+        )
+        // Remove alphanumeric codes (booking refs, ticket IDs) — mixed letters+digits, 6+ chars
+        title = title.replacingOccurrences(
+            of: "\\s+(?=[A-Za-z0-9]*[A-Z])(?=[A-Za-z0-9]*[0-9])[A-Z0-9]{6,}$",
+            with: "", options: .regularExpression
+        )
+        title = title.replacingOccurrences(
+            of: "^(?=[A-Za-z0-9]*[A-Z])(?=[A-Za-z0-9]*[0-9])[A-Z0-9]{6,}[_ -]+",
+            with: "", options: .regularExpression
+        )
+        // Clean separators
+        title = title
+            .replacingOccurrences(of: "_", with: " ")
+            .replacingOccurrences(of: "-", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        while title.contains("  ") {
+            title = title.replacingOccurrences(of: "  ", with: " ")
+        }
+        return title.isEmpty ? "Documento importado" : title
     }
 }

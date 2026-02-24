@@ -246,6 +246,20 @@ final class LibraryViewModel: ObservableObject {
             options: .regularExpression
         )
 
+        // Remove alphanumeric codes that mix letters+digits (booking refs, ticket IDs)
+        // e.g. "J3ZN2TEN6", "AB12CD34" — at least 6 chars, must contain both letters and digits
+        title = title.replacingOccurrences(
+            of: "\\s+(?=[A-Za-z0-9]*[A-Z])(?=[A-Za-z0-9]*[0-9])[A-Z0-9]{6,}$",
+            with: "",
+            options: .regularExpression
+        )
+        // Same pattern at the start
+        title = title.replacingOccurrences(
+            of: "^(?=[A-Za-z0-9]*[A-Z])(?=[A-Za-z0-9]*[0-9])[A-Z0-9]{6,}[_ -]+",
+            with: "",
+            options: .regularExpression
+        )
+
         // Clean separators
         title = title
             .replacingOccurrences(of: "_", with: " ")

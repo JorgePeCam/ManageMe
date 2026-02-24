@@ -4,7 +4,7 @@ import Security
 /// Q&A provider using Google Gemini API (free tier)
 /// Used as the primary cloud provider — free, no cost to developer or user.
 /// Includes per-device daily rate limiting to protect the shared API quota.
-final class GeminiQAProvider: QAProvider {
+final class GeminiQAProvider: StreamableQAProvider {
     var name: String { "Asistente inteligente" }
     var kind: QAProviderKind { .cloud }
 
@@ -62,23 +62,27 @@ final class GeminiQAProvider: QAProvider {
         URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent?key=\(apiKey)")!
     }
 
+    private var streamEndpoint: URL {
+        URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):streamGenerateContent?alt=sse&key=\(apiKey)")!
+    }
+
     func answer(query: String, context: [SearchResult]) async throws -> String {
         let keyPreview = String(apiKey.prefix(10)) + "..."
-        print("[Gemini] 🚀 Starting request. Key=\(keyPreview) model=\(model) isAvailable=\(isAvailable)")
+        AppLogger.debug("[Gemini] 🚀 Starting request. Key=\(keyPreview) model=\(model) isAvailable=\(isAvailable)")
 
         guard !apiKey.isEmpty else {
-            print("[Gemini] ❌ API key is empty")
+            AppLogger.debug("[Gemini] ❌ API key is empty")
             throw QAError.noProviderAvailable
         }
 
         // Check rate limit before making the call
         if DailyUsageTracker.isLimitReached(limit: Self.dailyLimitPerDevice) {
-            print("[Gemini] ❌ Daily limit reached (\(Self.dailyLimitPerDevice)). Falling back.")
+            AppLogger.debug("[Gemini] ❌ Daily limit reached (\(Self.dailyLimitPerDevice)). Falling back.")
             throw QAError.noProviderAvailable
         }
 
         let prompt = QAService.buildPrompt(query: query, context: Array(context.prefix(8)))
-        print("[Gemini] Prompt length: \(prompt.count) chars, context chunks: \(min(context.count, 8))")
+        AppLogger.debug("[Gemini] Prompt length: \(prompt.count) chars, context chunks: \(min(context.count, 8))")
 
         let requestBody: [String: Any] = [
             "contents": [
@@ -96,12 +100,12 @@ final class GeminiQAProvider: QAProvider {
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
         request.timeoutInterval = 30
 
-        print("[Gemini] 📡 Calling \(model)...")
+        AppLogger.debug("[Gemini] 📡 Calling \(model)...")
         let (data, response): (Data, URLResponse)
         do {
             (data, response) = try await URLSession.shared.data(for: request)
         } catch {
-            print("[Gemini] ❌ Network error: \(error.localizedDescription)")
+            AppLogger.debug("[Gemini] ❌ Network error: \(error.localizedDescription)")
             throw error
         }
 
@@ -111,13 +115,13 @@ final class GeminiQAProvider: QAProvider {
 
         // Global rate limit hit (too many users) — fall back gracefully
         if httpResponse.statusCode == 429 {
-            print("[Gemini] HTTP 429 — global rate limit. Falling back.")
+            AppLogger.debug("[Gemini] HTTP 429 — global rate limit. Falling back.")
             throw QAError.noProviderAvailable
         }
 
         if httpResponse.statusCode != 200 {
             let bodyStr = String(data: data, encoding: .utf8) ?? "(no body)"
-            print("[Gemini] ❌ HTTP \(httpResponse.statusCode): \(bodyStr.prefix(300))")
+            AppLogger.debug("[Gemini] ❌ HTTP \(httpResponse.statusCode): \(bodyStr.prefix(300))")
             if let errorBody = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                let error = errorBody["error"] as? [String: Any],
                let message = error["message"] as? String {
@@ -139,9 +143,92 @@ final class GeminiQAProvider: QAProvider {
         // Success — count this usage
         DailyUsageTracker.increment()
         let remaining = remainingQueries
-        print("[Gemini] ✅ Response OK. Usage today: \(DailyUsageTracker.todayCount)/\(Self.dailyLimitPerDevice) (remaining: \(remaining))")
+        AppLogger.debug("[Gemini] ✅ Response OK. Usage today: \(DailyUsageTracker.todayCount)/\(Self.dailyLimitPerDevice) (remaining: \(remaining))")
 
         return text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    // MARK: - Streaming
+
+    func streamAnswer(query: String, context: [SearchResult], onUpdate: @escaping (String) -> Void) async throws {
+        let keyPreview = String(apiKey.prefix(10)) + "..."
+        AppLogger.debug("[Gemini] 🚀 Starting STREAM request. Key=\(keyPreview) model=\(model)")
+
+        guard !apiKey.isEmpty else {
+            throw QAError.noProviderAvailable
+        }
+
+        if DailyUsageTracker.isLimitReached(limit: Self.dailyLimitPerDevice) {
+            AppLogger.debug("[Gemini] ❌ Daily limit reached. Falling back.")
+            throw QAError.noProviderAvailable
+        }
+
+        let prompt = QAService.buildPrompt(query: query, context: Array(context.prefix(8)))
+
+        let requestBody: [String: Any] = [
+            "contents": [
+                ["parts": [["text": prompt]]]
+            ],
+            "generationConfig": [
+                "maxOutputTokens": 2048,
+                "temperature": 0.3
+            ]
+        ]
+
+        var request = URLRequest(url: streamEndpoint)
+        request.httpMethod = "POST"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+        request.timeoutInterval = 60
+
+        AppLogger.debug("[Gemini] 📡 Streaming from \(model)...")
+
+        let (bytes, response) = try await URLSession.shared.bytes(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw QAError.apiError("Respuesta no válida")
+        }
+
+        if httpResponse.statusCode == 429 {
+            AppLogger.debug("[Gemini] HTTP 429 — global rate limit. Falling back.")
+            throw QAError.noProviderAvailable
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            AppLogger.debug("[Gemini] ❌ Stream HTTP \(httpResponse.statusCode)")
+            throw QAError.apiError("HTTP \(httpResponse.statusCode)")
+        }
+
+        // Parse SSE stream: lines prefixed with "data: " containing JSON chunks
+        var accumulated = ""
+
+        for try await line in bytes.lines {
+            // SSE format: "data: {json}" lines
+            guard line.hasPrefix("data: ") else { continue }
+            let jsonString = String(line.dropFirst(6))
+            guard !jsonString.isEmpty else { continue }
+
+            guard let data = jsonString.data(using: .utf8),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let candidates = json["candidates"] as? [[String: Any]],
+                  let first = candidates.first,
+                  let content = first["content"] as? [String: Any],
+                  let parts = content["parts"] as? [[String: Any]],
+                  let text = parts.first?["text"] as? String else {
+                continue
+            }
+
+            accumulated += text
+            onUpdate(accumulated)
+        }
+
+        guard !accumulated.isEmpty else {
+            throw QAError.apiError("No se recibió contenido en el stream")
+        }
+
+        // Success — count usage
+        DailyUsageTracker.increment()
+        AppLogger.debug("[Gemini] ✅ Stream complete. Length=\(accumulated.count) chars. Usage: \(DailyUsageTracker.todayCount)/\(Self.dailyLimitPerDevice)")
     }
 }
 

@@ -157,11 +157,25 @@ final class ChatViewModel: ObservableObject {
 
     private var genericIntentTerms: Set<String> {
         [
+            // Interrogatives & common verbs
             "que", "qué", "hice", "hago", "hacer", "hace", "durante", "trabajo", "trabaje", "trabajando",
             "deberia", "debería", "hoy", "ahora", "mi", "mis", "sobre", "acerca", "como", "cuando", "donde", "quien",
-            "tiempo", "dia", "dias", "mes", "meses", "ano", "anos", "cosa", "cosas", "algo", "nada",
-            "bien", "mal", "mucho", "poco", "forma", "manera", "parte", "tipo", "vez", "veces",
-            "nombre", "numero", "fecha", "precio", "pago", "dinero", "total", "cuenta",
+            "cuanto", "cuánto", "cuantos", "cuantas", "cuanta", "cuánta",
+            "puedo", "puede", "podria", "podría", "quiero", "necesito", "tengo", "tuve",
+            // Time
+            "tiempo", "dia", "dias", "mes", "meses", "ano", "anos", "semana", "semanas",
+            "pasado", "pasada", "anterior", "ultimo", "última", "siguiente", "proximo",
+            "ayer", "manana", "mañana", "hoy",
+            // Generic nouns
+            "cosa", "cosas", "algo", "nada", "bien", "mal", "mucho", "poco",
+            "forma", "manera", "parte", "tipo", "vez", "veces",
+            "nombre", "numero", "fecha",
+            // Money & payments
+            "precio", "pago", "pague", "pagué", "dinero", "total", "cuenta", "coste", "costo",
+            "gaste", "gasté", "gasto", "gastos", "factura", "recibo",
+            // Utilities & household (generic, not entity names)
+            "luz", "agua", "gas", "electricidad", "telefono", "teléfono", "internet", "alquiler",
+            // Weather (non-document queries)
             "clima", "lluvia", "sol", "temperatura", "grados", "calor", "frio"
         ]
     }
@@ -511,23 +525,23 @@ final class ChatViewModel: ObservableObject {
                 minScore: 0.3
             )
 
-            print("[QA] Query: \"\(query)\"")
-            print("[QA] Salient terms: \(salientQueryTerms(from: query))")
-            print("[QA] Hybrid results: \(results.count)")
+            AppLogger.debug("[QA] Query: \"\(query)\"")
+            AppLogger.debug("[QA] Salient terms: \(salientQueryTerms(from: query))")
+            AppLogger.debug("[QA] Hybrid results: \(results.count)")
             for (i, r) in results.prefix(5).enumerated() {
-                print("[QA]   [\(i)] score=\(String(format: "%.3f", r.score)) doc=\"\(r.documentTitle)\" chunk=\(r.chunkIndex ?? -1) text=\"\(r.chunkContent.prefix(80))...\"")
+                AppLogger.debug("[QA]   [\(i)] score=\(String(format: "%.3f", r.score)) doc=\"\(r.documentTitle)\" chunk=\(r.chunkIndex ?? -1) text=\"\(r.chunkContent.prefix(80))...\"")
             }
 
             if results.isEmpty {
-                print("[QA] ❌ No hybrid results")
+                AppLogger.debug("[QA] ❌ No hybrid results")
                 await addBotMessage("No encontré información relevante en tus documentos. Prueba con otra pregunta o importa más archivos.")
                 return
             }
 
             let contextResults = selectContextResults(from: results, query: query, limit: 5)
-            print("[QA] Context selected: \(contextResults.count)")
+            AppLogger.debug("[QA] Context selected: \(contextResults.count)")
             guard !contextResults.isEmpty else {
-                print("[QA] ❌ selectContextResults returned empty")
+                AppLogger.debug("[QA] ❌ selectContextResults returned empty")
                 await addBotMessage("No encontré información relevante en tus documentos. Prueba con otra pregunta o importa más archivos.")
                 return
             }
@@ -547,9 +561,43 @@ final class ChatViewModel: ObservableObject {
             // Generic queries ("qué tiempo hace") need much higher score to pass
             let minBest: Float = hasSpecificTerms ? 0.40 : 0.60
             let minAvg: Float = hasSpecificTerms ? 0.35 : 0.55
-            print("[QA] Relevance: best=\(String(format: "%.3f", bestScore)) avg=\(String(format: "%.3f", avgScore)) specific=\(specificTerms) thresholds=(\(minBest),\(minAvg))")
+            AppLogger.debug("[QA] Relevance: best=\(String(format: "%.3f", bestScore)) avg=\(String(format: "%.3f", avgScore)) specific=\(specificTerms) thresholds=(\(minBest),\(minAvg))")
+
+            // Lexical overlap guard: verify the context actually contains words
+            // from the query. This prevents vector-only matches where the embedding
+            // is "close" but the content is about a completely different topic.
+            // This is the MAIN defense against irrelevant answers — not word blocklists.
+            do {
+                let queryMeaningful = Set(ChunkRepository.meaningfulWords(from: query).map(normalizedText))
+                let contextText = contextResults.map(\.chunkContent).joined(separator: " ") + " " + contextResults.map(\.documentTitle).joined(separator: " ")
+                let contextTokens = normalizedTokenSet(contextText)
+                let specificSet = Set(specificTerms)
+                let specificOverlap = specificSet.intersection(contextTokens)
+                let meaningfulOverlap = queryMeaningful.intersection(contextTokens)
+                AppLogger.debug("[QA] Lexical guard: specific=\(specificSet) found=\(specificOverlap) meaningful=\(queryMeaningful) found=\(meaningfulOverlap)")
+
+                if hasSpecificTerms {
+                    // Require MOST specific terms to appear in context.
+                    // "adelgazar" query matching only "necesario" in legal text → reject.
+                    // "Indra" query matching "Indra" in CV → pass.
+                    let required = specificSet.count <= 3 ? specificSet.count : (specificSet.count + 1) / 2
+                    if specificOverlap.count < required {
+                        AppLogger.debug("[QA] ❌ Only \(specificOverlap.count)/\(specificSet.count) specific terms in context (need \(required)) — rejecting")
+                        await addBotMessage("No encontré información sobre esto en tus documentos.")
+                        return
+                    }
+                } else {
+                    // Fully generic query — need strong lexical evidence
+                    if meaningfulOverlap.count < 2 {
+                        AppLogger.debug("[QA] ❌ Generic query with weak lexical overlap (\(meaningfulOverlap.count)) — rejecting")
+                        await addBotMessage("No encontré información sobre esto en tus documentos.")
+                        return
+                    }
+                }
+            }
+
             if bestScore < minBest || avgScore < minAvg {
-                print("[QA] ❌ Low relevance — rejecting query")
+                AppLogger.debug("[QA] ❌ Low relevance — rejecting query")
                 await addBotMessage("No encontré información sobre esto en tus documentos.")
                 return
             }
@@ -558,7 +606,7 @@ final class ChatViewModel: ObservableObject {
                 query: query,
                 limit: 15
             )
-            print("[QA] Expanded context: \(contextForAnswer.count) chunks")
+            AppLogger.debug("[QA] Expanded context: \(contextForAnswer.count) chunks")
 
             var seenCitationKeys = Set<String>()
             let citations = contextResults.compactMap { result -> Citation? in
@@ -573,7 +621,7 @@ final class ChatViewModel: ObservableObject {
             }
 
             let providerName = qaService.activeProvider?.name ?? "NONE"
-            print("[QA] Provider: \(providerName) available=\(qaService.hasAnyProvider)")
+            AppLogger.debug("[QA] Provider: \(providerName) available=\(qaService.hasAnyProvider)")
 
             if qaService.hasAnyProvider {
                 var placeholderIndex: Int?
@@ -628,7 +676,7 @@ final class ChatViewModel: ObservableObject {
                         await persistBotMessage(msg)
                     }
                 } catch {
-                    print("[QA] ⚠️ LLM failed, using extractive fallback. Error: \(error.localizedDescription)")
+                    AppLogger.debug("[QA] ⚠️ LLM failed, using extractive fallback. Error: \(error.localizedDescription)")
                     let answer = buildExtractiveAnswer(from: contextForAnswer, query: query)
                     if let placeholderIndex,
                        placeholderIndex < messages.count {
@@ -647,7 +695,7 @@ final class ChatViewModel: ObservableObject {
                     }
                 }
             } else {
-                print("[QA] ⚠️ No LLM provider available — using extractive fallback (may be daily limit reached)")
+                AppLogger.debug("[QA] ⚠️ No LLM provider available — using extractive fallback (may be daily limit reached)")
                 let answer = buildExtractiveAnswer(from: contextForAnswer, query: query)
                 let msg = ChatMessage(content: answer, isUser: false, citations: citations)
                 messages.append(msg)
@@ -760,9 +808,53 @@ final class ChatViewModel: ObservableObject {
             return "No encontré información sobre esto en tus documentos."
         }
 
-        // Collect all text from the best document in order, deduplicating
-        // lines that appear in overlapping chunks (200-char overlap between chunks).
-        let sortedChunks = bestDoc.results.sorted { ($0.chunkIndex ?? 0) < ($1.chunkIndex ?? 0) }
+        // Build answer from top documents (include secondary if relevant enough)
+        let secondDocScore = docScores.count > 1 ? docScores[1].score : 0
+        let docsToInclude = docScores.prefix(secondDocScore > bestDoc.score / 2 ? 2 : 1)
+
+        var documentAnswers: [(title: String, content: String)] = []
+
+        for doc in docsToInclude {
+            let content = buildExtractiveContent(
+                from: doc.results,
+                queryWords: queryWords,
+                queryWordsOriginal: queryWordsOriginal,
+                boilerplate: boilerplate
+            )
+            if !content.isEmpty {
+                documentAnswers.append((doc.title, content))
+            }
+        }
+
+        guard !documentAnswers.isEmpty else {
+            return "No encontré información sobre esto en tus documentos."
+        }
+
+        let entityName = queryWordsOriginal.first { $0.first?.isUppercase == true }
+            ?? salientQueryTerms(from: query).first
+            ?? "tu consulta"
+
+        if documentAnswers.count == 1 {
+            return "Según **\(documentAnswers[0].title)**, esta es la información que encontré sobre \(entityName):\n\n\(documentAnswers[0].content)"
+        }
+
+        // Multiple documents
+        var answer = "Encontré información sobre \(entityName) en \(documentAnswers.count) documentos:\n"
+        for docAnswer in documentAnswers {
+            answer += "\n**\(docAnswer.title)**:\n\(docAnswer.content)\n"
+        }
+        return answer.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Extracts the most relevant content from a set of search results for one document.
+    private func buildExtractiveContent(
+        from results: [SearchResult],
+        queryWords: Set<String>,
+        queryWordsOriginal: [String],
+        boilerplate: Set<String>
+    ) -> String {
+        // Collect all text in chunk order, deduplicating overlapping lines
+        let sortedChunks = results.sorted { ($0.chunkIndex ?? 0) < ($1.chunkIndex ?? 0) }
 
         var seenLines = Set<String>()
         var allLines: [String] = []
@@ -772,7 +864,6 @@ final class ChatViewModel: ObservableObject {
                 .map { $0.trimmingCharacters(in: .whitespaces) }
                 .filter { !$0.isEmpty && $0.count > 3 }
             for line in lines {
-                // Deduplicate using normalized text to catch near-identical lines
                 let key = normalizedText(line)
                 if seenLines.insert(key).inserted {
                     allLines.append(line)
@@ -780,34 +871,49 @@ final class ChatViewModel: ObservableObject {
             }
         }
 
-        // Extract relevant sections: group consecutive relevant lines together
+        // Score each line for relevance
+        struct ScoredLine {
+            let text: String
+            let index: Int
+            let score: Int
+        }
+
+        let scoredLines: [ScoredLine] = allLines.enumerated().map { (idx, line) in
+            let lineLower = line.lowercased()
+            let lineWords = normalizedTokenSet(line)
+            var score = queryWords.intersection(lineWords).count * 3
+
+            // Boost proper nouns
+            for word in queryWordsOriginal {
+                if word.first?.isUppercase == true && line.contains(word) { score += 5 }
+            }
+
+            // Lines with colons or key-value patterns are often informative
+            if line.contains(":") && line.count > 15 { score += 1 }
+
+            // Penalize boilerplate
+            for word in boilerplate where lineLower.contains(word) { score -= 5 }
+
+            return ScoredLine(text: line, index: idx, score: max(score, 0))
+        }
+
+        // Group consecutive relevant lines into sections
+        // A line is "relevant" if it scores > 0 or is a neighbor of a scoring line
         var sections: [(lines: [String], relevance: Int)] = []
         var currentSection: [String] = []
         var currentRelevance = 0
         var gapCount = 0
 
-        for line in allLines {
-            let lineLower = line.lowercased()
-            let lineWords = normalizedTokenSet(line)
-            var lineScore = queryWords.intersection(lineWords).count * 3
-
-            for word in queryWordsOriginal {
-                if word.first?.isUppercase == true && line.contains(word) { lineScore += 5 }
-            }
-
-            for word in boilerplate where lineLower.contains(word) { lineScore -= 5 }
-
-            if lineScore > 0 {
-                if gapCount > 0 && gapCount <= 2 && !currentSection.isEmpty {
-                    // Small gap: include skipped lines for continuity
-                }
-                currentSection.append(line)
-                currentRelevance += lineScore
+        for scored in scoredLines {
+            if scored.score > 0 {
+                currentSection.append(scored.text)
+                currentRelevance += scored.score
                 gapCount = 0
             } else if !currentSection.isEmpty {
                 gapCount += 1
-                if gapCount <= 2 {
-                    currentSection.append(line)
+                if gapCount <= 3 {
+                    // Keep context lines between relevant blocks
+                    currentSection.append(scored.text)
                 } else {
                     sections.append((currentSection, currentRelevance))
                     currentSection = []
@@ -821,39 +927,27 @@ final class ChatViewModel: ObservableObject {
             sections.append((currentSection, currentRelevance))
         }
 
-        // Sort sections by relevance, take top ones
+        // Sort by relevance, take top sections
         sections.sort { $0.relevance > $1.relevance }
         let topSections = sections.prefix(4)
 
-        guard !topSections.isEmpty else {
-            return "No encontré información sobre esto en tus documentos."
-        }
+        guard !topSections.isEmpty else { return "" }
 
-        // Build a structured answer
-        let entityName = queryWordsOriginal.first { $0.first?.isUppercase == true }
-            ?? salientQueryTerms(from: query).first
-            ?? "tu consulta"
-
-        var answer = "Según **\(bestDoc.title)**, esta es la información que encontré sobre \(entityName):\n\n"
-
+        var content = ""
         for (idx, section) in topSections.enumerated() {
-            if topSections.count > 1 && idx > 0 {
-                answer += "\n\n"
-            }
+            if idx > 0 { content += "\n" }
 
-            // Format as bullet points for readability
             let cleanedLines = section.lines.filter { $0.count > 5 }
             if cleanedLines.count <= 3 {
-                answer += cleanedLines.joined(separator: ". ")
+                content += cleanedLines.joined(separator: ". ") + "\n"
             } else {
                 for line in cleanedLines {
-                    // Skip very short header-like lines
                     if line.count < 10 && !line.contains(":") { continue }
-                    answer += "• \(line)\n"
+                    content += "• \(line)\n"
                 }
             }
         }
 
-        return answer.trimmingCharacters(in: .whitespacesAndNewlines)
+        return content.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

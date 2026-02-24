@@ -26,4 +26,12 @@ enum AppLogger {
     static func error(_ message: String) {
         logger.error("\(message, privacy: .public)")
     }
+
+    /// Debug-only logging — completely stripped from release builds.
+    static func debug(_ message: String) {
+        #if DEBUG
+        let msg = message
+        logger.debug("\(msg, privacy: .public)")
+        #endif
+    }
 }

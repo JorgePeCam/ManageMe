@@ -63,15 +63,15 @@ final class QAService {
     func answer(query: String, context: [SearchResult]) async throws -> String {
         var lastError: Error?
 
-        print("[QAService] Providers: \(providers.map { "\($0.name) available=\($0.isAvailable)" })")
+        AppLogger.debug("[QAService] Providers: \(providers.map { "\($0.name) available=\($0.isAvailable)" })")
         for provider in providers where provider.isAvailable {
             do {
-                print("[QAService] Trying provider: \(provider.name)")
+                AppLogger.debug("[QAService] Trying provider: \(provider.name)")
                 let result = try await provider.answer(query: query, context: context)
-                print("[QAService] ✅ \(provider.name) succeeded")
+                AppLogger.debug("[QAService] ✅ \(provider.name) succeeded")
                 return result
             } catch {
-                print("[QAService] ⚠️ \(provider.name) failed: \(error.localizedDescription)")
+                AppLogger.debug("[QAService] ⚠️ \(provider.name) failed: \(error.localizedDescription)")
                 lastError = error
                 continue // Try next provider
             }
@@ -84,20 +84,20 @@ final class QAService {
     func streamAnswer(query: String, context: [SearchResult], onUpdate: @escaping (String) -> Void) async throws {
         var lastError: Error?
 
-        print("[QAService] Stream — Providers: \(providers.map { "\($0.name) available=\($0.isAvailable)" })")
+        AppLogger.debug("[QAService] Stream — Providers: \(providers.map { "\($0.name) available=\($0.isAvailable)" })")
         for provider in providers where provider.isAvailable {
             do {
-                print("[QAService] Stream — Trying: \(provider.name)")
+                AppLogger.debug("[QAService] Stream — Trying: \(provider.name)")
                 if let streamable = provider as? StreamableQAProvider {
                     try await streamable.streamAnswer(query: query, context: context, onUpdate: onUpdate)
                 } else {
                     let result = try await provider.answer(query: query, context: context)
                     onUpdate(result)
                 }
-                print("[QAService] ✅ Stream — \(provider.name) succeeded")
+                AppLogger.debug("[QAService] ✅ Stream — \(provider.name) succeeded")
                 return // Success
             } catch {
-                print("[QAService] ⚠️ Stream — \(provider.name) failed: \(error.localizedDescription)")
+                AppLogger.debug("[QAService] ⚠️ Stream — \(provider.name) failed: \(error.localizedDescription)")
                 lastError = error
                 continue // Try next provider
             }
