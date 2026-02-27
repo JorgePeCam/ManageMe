@@ -108,31 +108,17 @@ final class QAService {
 
     /// Backward-compatible prompt builder used by tests and providers.
     static func buildPrompt(query: String, context: [SearchResult]) -> String {
-        var prompt = """
-        Eres un asistente personal que responde preguntas basándose ÚNICAMENTE en los documentos del usuario.
+        let lang = AppLanguage.current
 
-        REGLAS:
-        - Responde SOLO con información que aparezca en los fragmentos proporcionados.
-        - Si los fragmentos NO contienen información relevante, responde EXACTAMENTE: "No encontré información sobre esto en tus documentos."
-        - NO inventes ni supongas información que no esté en los fragmentos.
-        - Responde en el mismo idioma que la pregunta.
-        - Cita el nombre del documento cuando sea relevante.
-
-        ESTILO DE RESPUESTA:
-        - Desarrolla la respuesta con detalle: incluye todos los datos relevantes que encuentres (fechas, nombres, tecnologías, responsabilidades, cantidades, etc.)
-        - Organiza la información de forma clara usando párrafos, listas o secciones según convenga.
-        - Si hay información distribuida en varios fragmentos del mismo documento, sintetízala en una respuesta coherente y completa.
-        - No te limites a una línea; elabora una respuesta completa que responda la pregunta del usuario a fondo.
-
-        FRAGMENTOS DE DOCUMENTOS:
-        """
+        var prompt = lang.systemPrompt
+        prompt += "\n\n\(lang.snippetsHeader)"
 
         for (index, result) in context.enumerated() {
-            prompt += "\n\n--- Documento: \(result.documentTitle) (fragmento \(index + 1)) ---\n"
+            prompt += "\n\n\(lang.snippetLabel(title: result.documentTitle, index: index + 1))\n"
             prompt += result.chunkContent
         }
 
-        prompt += "\n\nPREGUNTA: \(query)"
+        prompt += "\n\n\(lang.questionLabel): \(query)"
         return prompt
     }
 }

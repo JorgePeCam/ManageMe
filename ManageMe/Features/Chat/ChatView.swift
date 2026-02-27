@@ -5,6 +5,8 @@ struct ChatView: View {
     @FocusState private var isInputFocused: Bool
     @State private var showHistory = false
 
+    private var lang: AppLanguage { AppLanguage.current }
+
     var body: some View {
         NavigationStack {
             Group {
@@ -22,7 +24,7 @@ struct ChatView: View {
                 inputBar
             }
             .background(Color.appCardSecondary)
-            .navigationTitle(viewModel.currentConversation?.title ?? "Preguntar")
+            .navigationTitle(viewModel.currentConversation?.title ?? lang.chatEmptyTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -65,20 +67,20 @@ struct ChatView: View {
             .padding(.top, 32)
 
             VStack(spacing: 6) {
-                Text("Pregunta lo que quieras")
+                Text(lang.chatEmptyTitle)
                     .font(.title3)
                     .fontWeight(.bold)
 
-                Text("Buscaré en tus documentos\ny te responderé con precisión")
+                Text(lang.chatEmptySubtitle)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
 
             VStack(spacing: 10) {
-                suggestionCard("¿Mi lavadora sigue en garantía?", icon: "washer")
-                suggestionCard("¿Cuánto pagué de luz el mes pasado?", icon: "bolt")
-                suggestionCard("¿Qué cubre mi seguro de hogar?", icon: "house.lodge")
+                suggestionCard(lang == .spanish ? "¿Mi lavadora sigue en garantía?" : "Is my washing machine still under warranty?", icon: "washer")
+                suggestionCard(lang == .spanish ? "¿Cuánto pagué de luz el mes pasado?" : "How much did I pay for electricity last month?", icon: "bolt")
+                suggestionCard(lang == .spanish ? "¿Qué cubre mi seguro de hogar?" : "What does my home insurance cover?", icon: "house.lodge")
             }
 
             // Recent conversations quick access
@@ -92,14 +94,14 @@ struct ChatView: View {
     private var recentConversations: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Conversaciones recientes")
+                Text(lang == .spanish ? "Conversaciones recientes" : "Recent conversations")
                     .font(.caption)
                     .fontWeight(.semibold)
                     .foregroundStyle(.secondary)
                     .textCase(.uppercase)
                     .tracking(0.5)
                 Spacer()
-                Button("Ver todas") {
+                Button(lang == .spanish ? "Ver todas" : "See all") {
                     showHistory = true
                 }
                 .font(.caption)
@@ -202,7 +204,7 @@ struct ChatView: View {
     private var searchingIndicator: some View {
         HStack(spacing: 10) {
             TypingIndicator()
-            Text("Buscando en tus documentos...")
+            Text(lang == .spanish ? "Buscando en tus documentos..." : "Searching your documents...")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
@@ -215,7 +217,7 @@ struct ChatView: View {
 
     private var inputBar: some View {
         HStack(alignment: .bottom, spacing: 10) {
-            TextField("Escribe tu pregunta...", text: $viewModel.queryText, axis: .vertical)
+            TextField(lang.chatPlaceholder, text: $viewModel.queryText, axis: .vertical)
                 .textFieldStyle(.plain)
                 .lineLimit(1...5)
                 .focused($isInputFocused)
@@ -298,7 +300,7 @@ struct MessageBubble: View {
 
     private var citationsView: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Fuentes")
+            Text(AppLanguage.current == .spanish ? "Fuentes" : "Sources")
                 .font(.caption2)
                 .fontWeight(.semibold)
                 .foregroundStyle(.secondary)
@@ -340,6 +342,8 @@ struct ConversationHistoryView: View {
     @Binding var isPresented: Bool
     @State private var showDeleteAllAlert = false
 
+    private var lang: AppLanguage { AppLanguage.current }
+
     var body: some View {
         NavigationStack {
             Group {
@@ -349,11 +353,11 @@ struct ConversationHistoryView: View {
                     conversationList
                 }
             }
-            .navigationTitle("Historial")
+            .navigationTitle(lang == .spanish ? "Historial" : "History")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cerrar") { isPresented = false }
+                    Button(lang == .spanish ? "Cerrar" : "Close") { isPresented = false }
                 }
                 if !viewModel.conversations.isEmpty {
                     ToolbarItem(placement: .primaryAction) {
@@ -366,15 +370,15 @@ struct ConversationHistoryView: View {
                     }
                 }
             }
-            .alert("Borrar todo el historial", isPresented: $showDeleteAllAlert) {
-                Button("Cancelar", role: .cancel) { }
-                Button("Borrar todo", role: .destructive) {
+            .alert(lang == .spanish ? "Borrar todo el historial" : "Delete all history", isPresented: $showDeleteAllAlert) {
+                Button(lang.cancelButton, role: .cancel) { }
+                Button(lang.deleteButton, role: .destructive) {
                     Task {
                         await viewModel.deleteAllConversations()
                     }
                 }
             } message: {
-                Text("Se eliminarán todas las conversaciones. Esta acción no se puede deshacer.")
+                Text(lang == .spanish ? "Se eliminarán todas las conversaciones. Esta acción no se puede deshacer." : "All conversations will be deleted. This action cannot be undone.")
             }
         }
     }
@@ -385,11 +389,11 @@ struct ConversationHistoryView: View {
                 .font(.system(size: 44))
                 .foregroundStyle(.tertiary)
 
-            Text("Sin conversaciones")
+            Text(lang == .spanish ? "Sin conversaciones" : "No conversations")
                 .font(.headline)
                 .foregroundStyle(.secondary)
 
-            Text("Tus conversaciones aparecerán aquí")
+            Text(lang == .spanish ? "Tus conversaciones aparecerán aquí" : "Your conversations will appear here")
                 .font(.subheadline)
                 .foregroundStyle(.tertiary)
         }
@@ -429,7 +433,7 @@ struct ConversationHistoryView: View {
                             Button(role: .destructive) {
                                 Task { await viewModel.deleteConversation(conv) }
                             } label: {
-                                Label("Borrar", systemImage: "trash")
+                                Label(lang == .spanish ? "Borrar" : "Delete", systemImage: "trash")
                             }
                         }
                     }
@@ -442,20 +446,23 @@ struct ConversationHistoryView: View {
     private var groupedConversations: [ConversationGroup] {
         let calendar = Calendar.current
         var groups: [String: [Conversation]] = [:]
-        let order = ["Hoy", "Ayer", "Esta semana", "Este mes", "Anteriores"]
+        let isSpanish = lang == .spanish
+        let order = isSpanish
+            ? ["Hoy", "Ayer", "Esta semana", "Este mes", "Anteriores"]
+            : ["Today", "Yesterday", "This week", "This month", "Older"]
 
         for conv in viewModel.conversations {
             let key: String
             if calendar.isDateInToday(conv.updatedAt) {
-                key = "Hoy"
+                key = isSpanish ? "Hoy" : "Today"
             } else if calendar.isDateInYesterday(conv.updatedAt) {
-                key = "Ayer"
+                key = isSpanish ? "Ayer" : "Yesterday"
             } else if calendar.isDate(conv.updatedAt, equalTo: Date(), toGranularity: .weekOfYear) {
-                key = "Esta semana"
+                key = isSpanish ? "Esta semana" : "This week"
             } else if calendar.isDate(conv.updatedAt, equalTo: Date(), toGranularity: .month) {
-                key = "Este mes"
+                key = isSpanish ? "Este mes" : "This month"
             } else {
-                key = "Anteriores"
+                key = isSpanish ? "Anteriores" : "Older"
             }
             groups[key, default: []].append(conv)
         }
@@ -485,16 +492,17 @@ private struct ConversationGroup: Hashable {
 extension Date {
     var relativeFormatted: String {
         let calendar = Calendar.current
+        let isSpanish = AppLanguage.current == .spanish
         if calendar.isDateInToday(self) {
             let formatter = DateFormatter()
             formatter.dateFormat = "HH:mm"
             return formatter.string(from: self)
         } else if calendar.isDateInYesterday(self) {
-            return "Ayer"
+            return isSpanish ? "Ayer" : "Yesterday"
         } else {
             let formatter = DateFormatter()
             formatter.dateFormat = "d MMM"
-            formatter.locale = Locale(identifier: "es_ES")
+            formatter.locale = Locale(identifier: isSpanish ? "es_ES" : "en_US")
             return formatter.string(from: self)
         }
     }

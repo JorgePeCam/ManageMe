@@ -125,7 +125,10 @@ struct ChunkRepository {
         "the", "is", "at", "which", "on", "and", "or", "in", "to", "of",
         "for", "with", "was", "are", "has", "have", "had", "not", "but",
         "from", "this", "that", "these", "those", "what", "when", "where",
-        "how", "who", "why", "my", "your", "his", "her", "its", "our"
+        "how", "who", "why", "my", "your", "his", "her", "its", "our",
+        "do", "does", "did", "will", "would", "could", "should", "can",
+        "about", "been", "being", "were", "they", "them", "their",
+        "all", "any", "some", "much", "many", "more", "most", "very"
     ]
 
     /// Converts user text into a valid FTS5 query.
@@ -217,14 +220,13 @@ struct ChunkRepository {
             .components(separatedBy: CharacterSet.alphanumerics.inverted)
             .filter { $0.count > 2 }
         let intentVerbs: Set<String> = [
-            // Verbs and generic question words — NOT entity names
+            // === SPANISH ===
             "hice", "hago", "hacer", "trabaje", "trabajo", "trabajar", "trabajando",
             "tuve", "tengo", "tener", "fui", "fue", "ser", "estar", "estuve",
             "dije", "decir", "puse", "poner", "hizo", "haciendo", "hace",
             "cual", "como", "donde", "cuando", "cuanto", "cuantos", "cuantas", "cuanta",
             "puedo", "puede", "podria", "quiero", "necesito",
             "labor", "experiencia", "puesto", "cargo", "funcion",
-            // Generic nouns that cause false matches
             "tiempo", "dia", "dias", "mes", "meses", "ano", "anos", "hoy", "ayer",
             "semana", "semanas", "pasado", "pasada", "anterior", "ultimo", "ultima",
             "cosa", "cosas", "parte", "partes", "tipo", "tipos", "forma", "manera",
@@ -232,10 +234,23 @@ struct ChunkRepository {
             "nombre", "numero", "fecha", "datos", "informacion", "documento",
             "precio", "pago", "pague", "dinero", "valor", "total", "cuenta",
             "gasto", "gastos", "gaste", "factura", "recibo", "coste", "costo",
-            // Utilities — generic, not proper nouns
             "luz", "agua", "gas", "electricidad", "telefono", "internet", "alquiler",
-            // Weather / non-document queries
-            "clima", "lluvia", "sol", "temperatura", "grados", "calor", "frio"
+            "clima", "lluvia", "sol", "temperatura", "grados", "calor", "frio",
+            // === ENGLISH ===
+            "what", "how", "much", "many", "does", "did", "can", "could", "would", "should",
+            "need", "want", "know", "think", "tell", "show", "give", "find", "get", "make",
+            "like", "look", "help", "work", "worked", "working",
+            "today", "yesterday", "tomorrow", "last", "next", "previous", "recent",
+            "week", "weeks", "month", "months", "year", "years", "day", "days", "time", "ago",
+            "thing", "things", "something", "nothing", "good", "bad", "way", "kind", "part",
+            "name", "number", "date", "information", "info", "document", "file",
+            "price", "pay", "paid", "payment", "money", "cost", "total", "bill", "receipt",
+            "spend", "spent", "expense", "expenses", "invoice",
+            "electricity", "water", "rent", "phone",
+            "weather", "rain", "sunny", "temperature", "degrees", "hot", "cold", "forecast",
+            "necessary", "important", "possible", "really", "very", "also",
+            "still", "just", "some", "any", "every", "each", "best", "most", "more", "less",
+            "lose", "weight", "diet", "healthy", "exercise"
         ]
         let entityTerms = Set(
             originalWords

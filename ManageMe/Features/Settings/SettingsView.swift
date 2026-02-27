@@ -3,9 +3,35 @@ import SwiftUI
 struct SettingsView: View {
     @StateObject private var viewModel = SettingsViewModel()
 
+    private var lang: AppLanguage { viewModel.lang }
+
     var body: some View {
         NavigationStack {
             List {
+                // Language
+                Section {
+                    ForEach(AppLanguage.allCases) { language in
+                        Button {
+                            viewModel.changeLanguage(to: language)
+                        } label: {
+                            HStack(spacing: 12) {
+                                Text(language.flag)
+                                    .font(.title3)
+                                Text(language.displayName)
+                                    .foregroundStyle(.primary)
+                                Spacer()
+                                if language == viewModel.selectedLanguage {
+                                    Image(systemName: "checkmark")
+                                        .foregroundStyle(Color.appAccent)
+                                        .fontWeight(.semibold)
+                                }
+                            }
+                        }
+                    }
+                } header: {
+                    Text(lang.languageSectionTitle)
+                }
+
                 // AI Section
                 Section {
                     HStack(spacing: 12) {
@@ -28,7 +54,7 @@ struct SettingsView: View {
                             .foregroundStyle(viewModel.isOnDeviceAIActive ? Color.appSuccess : .secondary)
                     }
                 } header: {
-                    Text("Inteligencia Artificial")
+                    Text(lang.aiSectionTitle)
                 } footer: {
                     Text(viewModel.aiFooterText)
                 }
@@ -39,9 +65,9 @@ struct SettingsView: View {
                 }
 
                 // Storage
-                Section("Almacenamiento") {
+                Section(lang.storageSectionTitle) {
                     HStack {
-                        Label("Documentos", systemImage: "doc.on.doc")
+                        Label(lang.documentsLabel, systemImage: "doc.on.doc")
                             .foregroundStyle(.primary)
                         Spacer()
                         Text("\(viewModel.documentCount)")
@@ -50,7 +76,7 @@ struct SettingsView: View {
                     }
 
                     HStack {
-                        Label("Espacio usado", systemImage: "internaldrive")
+                        Label(lang.storageUsedLabel, systemImage: "internaldrive")
                             .foregroundStyle(.primary)
                         Spacer()
                         Text(viewModel.storageUsed)
@@ -69,47 +95,47 @@ struct SettingsView: View {
                 }
 
                 // Actions
-                Section("Acciones") {
+                Section(lang.actionsSectionTitle) {
                     Button {
                         viewModel.reindexAll()
                     } label: {
-                        Label("Reindexar documentos", systemImage: "arrow.clockwise")
+                        Label(lang.reindexLabel, systemImage: "arrow.clockwise")
                             .foregroundStyle(Color.appAccent)
                     }
 
                     Button(role: .destructive) {
                         viewModel.showDeleteConfirmation = true
                     } label: {
-                        Label("Borrar todos los datos", systemImage: "trash")
+                        Label(lang.deleteAllLabel, systemImage: "trash")
                     }
                 }
 
                 // About
                 Section {
                     HStack {
-                        Label("Versión", systemImage: "info.circle")
+                        Label(lang.versionLabel, systemImage: "info.circle")
                         Spacer()
                         Text("1.0.0")
                             .foregroundStyle(.secondary)
                     }
                 } header: {
-                    Text("Acerca de")
+                    Text(lang.aboutSectionTitle)
                 } footer: {
-                    Text("ManageMe — Tu segundo cerebro digital")
+                    Text(lang.tagline)
                         .frame(maxWidth: .infinity)
                         .multilineTextAlignment(.center)
                         .padding(.top, 8)
                 }
             }
-            .navigationTitle("Ajustes")
+            .navigationTitle(lang.settingsTitle)
             .tint(Color.appAccent)
-            .alert("Borrar todos los datos", isPresented: $viewModel.showDeleteConfirmation) {
-                Button("Cancelar", role: .cancel) {}
-                Button("Borrar todo", role: .destructive) {
+            .alert(lang.deleteAllTitle, isPresented: $viewModel.showDeleteConfirmation) {
+                Button(lang.cancelButton, role: .cancel) {}
+                Button(lang.deleteButton, role: .destructive) {
                     viewModel.deleteAllData()
                 }
             } message: {
-                Text("Se eliminarán todos los documentos y datos. Esta acción no se puede deshacer.")
+                Text(lang.deleteAllMessage)
             }
             .task {
                 await viewModel.loadStats()
@@ -124,7 +150,7 @@ struct SettingsView: View {
                     viewModel.userErrorMessage = nil
                 }
             } message: {
-                Text(viewModel.userErrorMessage ?? "Ha ocurrido un error.")
+                Text(viewModel.userErrorMessage ?? "")
             }
         }
     }
@@ -140,7 +166,7 @@ struct SettingsView: View {
                     .foregroundStyle(SyncCoordinator.shared.iCloudAvailable ? Color.appAccent : .secondary)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Sincronización iCloud")
+                    Text(lang.iCloudTitle)
                         .font(.subheadline)
                         .fontWeight(.medium)
 
@@ -148,20 +174,20 @@ struct SettingsView: View {
                         HStack(spacing: 4) {
                             ProgressView()
                                 .scaleEffect(0.7)
-                            Text("Sincronizando...")
+                            Text(lang.iCloudSyncing)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
-                    } else if let lastSync = SyncCoordinator.shared.lastSyncDate {
-                        Text("Última sync: \(lastSync, style: .relative) atrás")
+                    } else if SyncCoordinator.shared.lastSyncDate != nil {
+                        Text(lang.iCloudActive)
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.appSuccess)
                     } else if SyncCoordinator.shared.iCloudAvailable {
-                        Text("Activa")
+                        Text(lang.iCloudActive)
                             .font(.caption)
                             .foregroundStyle(Color.appSuccess)
                     } else {
-                        Text("No disponible")
+                        Text(lang.iCloudUnavailable)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -186,7 +212,7 @@ struct SettingsView: View {
         } header: {
             Text("iCloud")
         } footer: {
-            Text("Documentos, carpetas y conversaciones se sincronizan automáticamente entre tus dispositivos.")
+            Text(lang.iCloudFooter)
         }
     }
 }

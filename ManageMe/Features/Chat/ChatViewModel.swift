@@ -157,6 +157,7 @@ final class ChatViewModel: ObservableObject {
 
     private var genericIntentTerms: Set<String> {
         [
+            // === SPANISH ===
             // Interrogatives & common verbs
             "que", "qué", "hice", "hago", "hacer", "hace", "durante", "trabajo", "trabaje", "trabajando",
             "deberia", "debería", "hoy", "ahora", "mi", "mis", "sobre", "acerca", "como", "cuando", "donde", "quien",
@@ -165,7 +166,7 @@ final class ChatViewModel: ObservableObject {
             // Time
             "tiempo", "dia", "dias", "mes", "meses", "ano", "anos", "semana", "semanas",
             "pasado", "pasada", "anterior", "ultimo", "última", "siguiente", "proximo",
-            "ayer", "manana", "mañana", "hoy",
+            "ayer", "manana", "mañana",
             // Generic nouns
             "cosa", "cosas", "algo", "nada", "bien", "mal", "mucho", "poco",
             "forma", "manera", "parte", "tipo", "vez", "veces",
@@ -173,10 +174,33 @@ final class ChatViewModel: ObservableObject {
             // Money & payments
             "precio", "pago", "pague", "pagué", "dinero", "total", "cuenta", "coste", "costo",
             "gaste", "gasté", "gasto", "gastos", "factura", "recibo",
-            // Utilities & household (generic, not entity names)
+            // Utilities & household
             "luz", "agua", "gas", "electricidad", "telefono", "teléfono", "internet", "alquiler",
-            // Weather (non-document queries)
-            "clima", "lluvia", "sol", "temperatura", "grados", "calor", "frio"
+            // Weather
+            "clima", "lluvia", "sol", "temperatura", "grados", "calor", "frio",
+
+            // === ENGLISH ===
+            // Interrogatives & common verbs
+            "what", "how", "much", "many", "does", "did", "can", "could", "would", "should",
+            "need", "want", "know", "think", "tell", "show", "give", "find", "get", "make",
+            "like", "look", "help", "work", "worked", "working",
+            // Time
+            "today", "yesterday", "tomorrow", "last", "next", "previous", "recent",
+            "week", "weeks", "month", "months", "year", "years", "day", "days", "time", "ago",
+            // Generic nouns
+            "thing", "things", "something", "nothing", "good", "bad", "way", "kind", "part",
+            "name", "number", "date", "information", "info", "document", "file",
+            // Money & payments
+            "price", "pay", "paid", "payment", "money", "cost", "total", "bill", "receipt",
+            "spend", "spent", "expense", "expenses", "invoice",
+            // Utilities & household
+            "electricity", "water", "rent", "phone", "internet",
+            // Weather
+            "weather", "rain", "sunny", "temperature", "degrees", "hot", "cold", "forecast",
+            // Other common generic
+            "necessary", "important", "possible", "able", "really", "very", "also",
+            "still", "just", "some", "any", "every", "each", "best", "most", "more", "less",
+            "lose", "weight", "diet", "healthy", "exercise"
         ]
     }
 
@@ -511,7 +535,7 @@ final class ChatViewModel: ObservableObject {
 
     private func search(query: String) async {
         guard let embeddingService = EmbeddingService.shared else {
-            await addBotMessage("El modelo de embeddings no está disponible. Asegúrate de que MiniLM está incluido en el proyecto.")
+            await addBotMessage(AppLanguage.current.embeddingsUnavailable)
             return
         }
 
@@ -534,7 +558,7 @@ final class ChatViewModel: ObservableObject {
 
             if results.isEmpty {
                 AppLogger.debug("[QA] ❌ No hybrid results")
-                await addBotMessage("No encontré información relevante en tus documentos. Prueba con otra pregunta o importa más archivos.")
+                await addBotMessage(AppLanguage.current.noRelevantResults)
                 return
             }
 
@@ -542,7 +566,7 @@ final class ChatViewModel: ObservableObject {
             AppLogger.debug("[QA] Context selected: \(contextResults.count)")
             guard !contextResults.isEmpty else {
                 AppLogger.debug("[QA] ❌ selectContextResults returned empty")
-                await addBotMessage("No encontré información relevante en tus documentos. Prueba con otra pregunta o importa más archivos.")
+                await addBotMessage(AppLanguage.current.noRelevantResults)
                 return
             }
 
@@ -583,14 +607,14 @@ final class ChatViewModel: ObservableObject {
                     let required = specificSet.count <= 3 ? specificSet.count : (specificSet.count + 1) / 2
                     if specificOverlap.count < required {
                         AppLogger.debug("[QA] ❌ Only \(specificOverlap.count)/\(specificSet.count) specific terms in context (need \(required)) — rejecting")
-                        await addBotMessage("No encontré información sobre esto en tus documentos.")
+                        await addBotMessage(AppLanguage.current.noInfoFound)
                         return
                     }
                 } else {
                     // Fully generic query — need strong lexical evidence
                     if meaningfulOverlap.count < 2 {
                         AppLogger.debug("[QA] ❌ Generic query with weak lexical overlap (\(meaningfulOverlap.count)) — rejecting")
-                        await addBotMessage("No encontré información sobre esto en tus documentos.")
+                        await addBotMessage(AppLanguage.current.noInfoFound)
                         return
                     }
                 }
@@ -598,7 +622,7 @@ final class ChatViewModel: ObservableObject {
 
             if bestScore < minBest || avgScore < minAvg {
                 AppLogger.debug("[QA] ❌ Low relevance — rejecting query")
-                await addBotMessage("No encontré información sobre esto en tus documentos.")
+                await addBotMessage(AppLanguage.current.noInfoFound)
                 return
             }
             let contextForAnswer = await expandContextWithNeighbors(
@@ -749,8 +773,7 @@ final class ChatViewModel: ObservableObject {
             if let temporalAnswer = buildTemporalAnswer(from: results, query: query) {
                 return temporalAnswer
             }
-            let entity = temporalEntityTerms(from: query).first ?? "esa experiencia"
-            return "No encontré una fecha explícita para \(entity) en el texto extraído del documento."
+            return AppLanguage.current.noInfoFound
         }
 
         let meaningful = ChunkRepository.meaningfulWords(from: query)
@@ -798,14 +821,14 @@ final class ChatViewModel: ObservableObject {
         docScores.sort { $0.score > $1.score }
 
         guard let bestDoc = docScores.first, bestDoc.score > 0 else {
-            return "No encontré información sobre esto en tus documentos."
+            return AppLanguage.current.noInfoFound
         }
 
         // Check minimum relevance
         let allTokens = normalizedTokenSet(bestDoc.results.map(\.chunkContent).joined(separator: " "))
         let matchingQueryWords = queryWords.filter { allTokens.contains($0) }
         if matchingQueryWords.isEmpty && (bestDoc.results.first?.score ?? 0) < 0.5 {
-            return "No encontré información sobre esto en tus documentos."
+            return AppLanguage.current.noInfoFound
         }
 
         // Build answer from top documents (include secondary if relevant enough)
@@ -827,19 +850,22 @@ final class ChatViewModel: ObservableObject {
         }
 
         guard !documentAnswers.isEmpty else {
-            return "No encontré información sobre esto en tus documentos."
+            return AppLanguage.current.noInfoFound
         }
 
+        let fallbackLabel = AppLanguage.current == .spanish ? "tu consulta" : "your query"
         let entityName = queryWordsOriginal.first { $0.first?.isUppercase == true }
             ?? salientQueryTerms(from: query).first
-            ?? "tu consulta"
+            ?? fallbackLabel
+
+        let lang = AppLanguage.current
 
         if documentAnswers.count == 1 {
-            return "Según **\(documentAnswers[0].title)**, esta es la información que encontré sobre \(entityName):\n\n\(documentAnswers[0].content)"
+            return "\(lang.extractiveHeader(docTitle: documentAnswers[0].title, entityName: entityName))\n\n\(documentAnswers[0].content)"
         }
 
         // Multiple documents
-        var answer = "Encontré información sobre \(entityName) en \(documentAnswers.count) documentos:\n"
+        var answer = "\(lang.extractiveMultiHeader(entityName: entityName, count: documentAnswers.count))\n"
         for docAnswer in documentAnswers {
             answer += "\n**\(docAnswer.title)**:\n\(docAnswer.content)\n"
         }

@@ -7,12 +7,15 @@ final class SettingsViewModel: ObservableObject {
     @Published var storageUsed = "Calculando..."
     @Published var showDeleteConfirmation = false
     @Published var userErrorMessage: String?
+    @Published var selectedLanguage: AppLanguage = AppLanguage.current
 
     private let repository = DocumentRepository()
 
     init() {
         APIKeyStore.migrateLegacyUserDefaultsKeyIfNeeded()
     }
+
+    var lang: AppLanguage { selectedLanguage }
 
     var embeddingModelStatus: String {
         EmbeddingService.shared != nil ? "MiniLM (activo)" : "No disponible"
@@ -32,24 +35,23 @@ final class SettingsViewModel: ObservableObject {
 
     var aiStatusText: String {
         switch QAService.shared.activeProviderKind {
-        case .onDevice:
-            return "Activo — en tu dispositivo"
-        case .cloud:
-            return "Activo — asistente inteligente"
-        case nil:
-            return "Modo básico"
+        case .onDevice: return lang.aiActiveOnDevice
+        case .cloud:    return lang.aiActiveCloud
+        case nil:       return lang.aiBasicMode
         }
     }
 
     var aiFooterText: String {
         switch QAService.shared.activeProviderKind {
-        case .onDevice:
-            return "Las respuestas se procesan en tu dispositivo. Privado y sin coste."
-        case .cloud:
-            return "Las respuestas se generan con inteligencia artificial. Requiere conexión a internet."
-        case nil:
-            return "Las respuestas se extraen directamente de tus documentos."
+        case .onDevice: return lang.aiFooterOnDevice
+        case .cloud:    return lang.aiFooterCloud
+        case nil:       return lang.aiFooterBasic
         }
+    }
+
+    func changeLanguage(to language: AppLanguage) {
+        selectedLanguage = language
+        AppLanguage.current = language
     }
 
     func loadStats() async {
