@@ -6,6 +6,8 @@ struct DocumentDetailView: View {
     let documentId: String
     @StateObject private var viewModel = DocumentDetailViewModel()
 
+    private var lang: AppLanguage { AppLanguage.current }
+
     var body: some View {
         ScrollView {
             if let document = viewModel.document {
@@ -35,7 +37,7 @@ struct DocumentDetailView: View {
             }
         }
         .background(Color.appCardSecondary)
-        .navigationTitle(viewModel.document?.title ?? "Documento")
+        .navigationTitle(viewModel.document?.title ?? lang.detailDocument)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if let doc = viewModel.document {
@@ -45,13 +47,13 @@ struct DocumentDetailView: View {
                             Button {
                                 viewModel.reprocess()
                             } label: {
-                                Label("Reintentar procesado", systemImage: "arrow.clockwise")
+                                Label(lang.detailRetryProcessing, systemImage: "arrow.clockwise")
                             }
                         }
 
                         if let url = doc.absoluteFileURL {
                             ShareLink(item: url) {
-                                Label("Compartir", systemImage: "square.and.arrow.up")
+                                Label(lang.detailShare, systemImage: "square.and.arrow.up")
                             }
                         }
                     } label: {
@@ -185,12 +187,12 @@ struct DocumentDetailView: View {
 
     private func statusTitle(_ document: Document) -> String {
         switch document.processingStatusEnum {
-        case .ready: return "Procesado correctamente"
-        case .error: return "Error al procesar"
-        case .pending: return "Pendiente"
-        case .extracting: return "Extrayendo texto..."
-        case .chunking: return "Fragmentando..."
-        case .embedding: return "Generando embeddings..."
+        case .ready: return lang.detailStatusReady
+        case .error: return lang.detailStatusError
+        case .pending: return lang.detailStatusPending
+        case .extracting: return lang.detailStatusExtracting
+        case .chunking: return lang.detailStatusChunking
+        case .embedding: return lang.detailStatusEmbedding
         }
     }
 
@@ -203,7 +205,7 @@ struct DocumentDetailView: View {
             HStack {
                 Image(systemName: "eye.fill")
                     .foregroundStyle(Color.appAccent)
-                Text("Ver archivo original")
+                Text(lang.detailViewOriginal)
                     .fontWeight(.medium)
             }
             .frame(maxWidth: .infinity)
@@ -225,12 +227,12 @@ struct DocumentDetailView: View {
             HStack {
                 Image(systemName: "text.alignleft")
                     .foregroundStyle(Color.appAccent)
-                Text("Texto extraído")
+                Text(lang.detailExtractedText)
                     .fontWeight(.semibold)
 
                 Spacer()
 
-                Text("\(document.content.count) caracteres")
+                Text(lang.detailCharCount(document.content.count))
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             }

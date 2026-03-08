@@ -52,6 +52,10 @@ struct DocumentCard: View {
 
                     statusIndicator
                 }
+
+                Text(document.createdAt.relativeFormatted)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
             }
             .padding(.horizontal, AppStyle.paddingSmall + 2)
             .padding(.vertical, AppStyle.paddingSmall)

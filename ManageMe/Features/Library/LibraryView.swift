@@ -10,6 +10,8 @@ struct LibraryView: View {
     @State private var documentToMove: String?
     @State private var showMoveSheet = false
 
+    private var lang: AppLanguage { AppLanguage.current }
+
     private let columns = [
         GridItem(.flexible(), spacing: AppStyle.cardSpacing),
         GridItem(.flexible(), spacing: AppStyle.cardSpacing)
@@ -26,7 +28,7 @@ struct LibraryView: View {
             }
             .navigationTitle(viewModel.currentFolderName)
             .navigationBarTitleDisplayMode(viewModel.isInFolder ? .inline : .large)
-            .searchable(text: $searchText, prompt: "Buscar documentos...")
+            .searchable(text: $searchText, prompt: lang.librarySearch)
             .toolbar {
                 if viewModel.isInFolder {
                     ToolbarItem(placement: .topBarLeading) {
@@ -35,14 +37,17 @@ struct LibraryView: View {
                         } label: {
                             HStack(spacing: 4) {
                                 Image(systemName: "chevron.left")
-                                Text("Atrás")
+                                Text(lang.libraryBack)
                             }
                             .foregroundStyle(Color.appAccent)
                         }
                     }
                 } else {
                     ToolbarItem(placement: .topBarLeading) {
-                        filterMenu
+                        HStack(spacing: 4) {
+                            filterMenu
+                            sortMenu
+                        }
                     }
                 }
 
@@ -51,13 +56,13 @@ struct LibraryView: View {
                         Button {
                             viewModel.showImporter = true
                         } label: {
-                            Label("Desde archivos", systemImage: "doc.badge.plus")
+                            Label(lang.libraryFromFiles, systemImage: "doc.badge.plus")
                         }
 
                         Button {
                             viewModel.showCamera = true
                         } label: {
-                            Label("Hacer foto", systemImage: "camera")
+                            Label(lang.libraryTakePhoto, systemImage: "camera")
                         }
 
                         Divider()
@@ -65,7 +70,7 @@ struct LibraryView: View {
                         Button {
                             showNewFolderAlert = true
                         } label: {
-                            Label("Nueva carpeta", systemImage: "folder.badge.plus")
+                            Label(lang.libraryNewFolder, systemImage: "folder.badge.plus")
                         }
                     } label: {
                         Image(systemName: "plus.circle.fill")
@@ -98,27 +103,27 @@ struct LibraryView: View {
                     await viewModel.loadDocuments()
                 }
             }
-            .alert("Nueva carpeta", isPresented: $showNewFolderAlert) {
-                TextField("Nombre", text: $newFolderName)
-                Button("Crear") {
+            .alert(lang.libraryNewFolder, isPresented: $showNewFolderAlert) {
+                TextField(lang.libraryFolderNameField, text: $newFolderName)
+                Button(lang.libraryCreate) {
                     viewModel.createFolder(name: newFolderName)
                     newFolderName = ""
                 }
-                Button("Cancelar", role: .cancel) { newFolderName = "" }
+                Button(lang.cancelButton, role: .cancel) { newFolderName = "" }
             }
-            .alert("Renombrar carpeta", isPresented: Binding(
+            .alert(lang.libraryRenameFolderTitle, isPresented: Binding(
                 get: { folderToRename != nil },
                 set: { if !$0 { folderToRename = nil } }
             )) {
-                TextField("Nombre", text: $renameFolderName)
-                Button("Renombrar") {
+                TextField(lang.libraryFolderNameField, text: $renameFolderName)
+                Button(lang.libraryRename) {
                     if let folder = folderToRename {
                         viewModel.renameFolder(folder, newName: renameFolderName)
                     }
                     folderToRename = nil
                     renameFolderName = ""
                 }
-                Button("Cancelar", role: .cancel) {
+                Button(lang.cancelButton, role: .cancel) {
                     folderToRename = nil
                     renameFolderName = ""
                 }
@@ -129,7 +134,7 @@ struct LibraryView: View {
             )) {
                 Button("OK", role: .cancel) { viewModel.userErrorMessage = nil }
             } message: {
-                Text(viewModel.userErrorMessage ?? "Ha ocurrido un error.")
+                Text(viewModel.userErrorMessage ?? lang.errorGeneric)
             }
         }
     }
@@ -141,7 +146,7 @@ struct LibraryView: View {
             Button {
                 viewModel.filterType = nil
             } label: {
-                Label("Todos", systemImage: viewModel.filterType == nil ? "checkmark" : "")
+                Label(lang.libraryAll, systemImage: viewModel.filterType == nil ? "checkmark" : "")
             }
             Divider()
             ForEach(FileType.allCases, id: \.self) { type in
@@ -158,6 +163,58 @@ struct LibraryView: View {
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(Color.appAccent)
         }
+    }
+
+    // MARK: - Sort Menu
+
+    private var sortMenu: some View {
+        Menu {
+            ForEach(LibrarySortOption.allCases, id: \.self) { option in
+                Button {
+                    viewModel.sortOption = option
+                } label: {
+                    HStack {
+                        Label(option.label, systemImage: option.icon)
+                        if viewModel.sortOption == option {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: "arrow.up.arrow.down.circle")
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(Color.appAccent)
+        }
+    }
+
+    // MARK: - Processing Banner
+
+    private var processingBanner: some View {
+        HStack(spacing: 10) {
+            ProgressView()
+                .scaleEffect(0.8)
+                .tint(Color.appAccent)
+
+            Text(lang.processingDocuments)
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundStyle(.secondary)
+
+            Spacer()
+
+            Text("\(viewModel.processingCount)")
+                .font(.caption)
+                .fontWeight(.bold)
+                .foregroundStyle(Color.appAccent)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 2)
+                .background(Color.appAccentLight)
+                .clipShape(Capsule())
+        }
+        .padding(.horizontal, AppStyle.padding)
+        .padding(.vertical, 8)
+        .background(Color.appAccentSoft)
     }
 
     // MARK: - Empty State
@@ -177,11 +234,11 @@ struct LibraryView: View {
             }
 
             VStack(spacing: 8) {
-                Text("Tu segundo cerebro")
+                Text(lang.libraryEmptyTitle)
                     .font(.title2)
                     .fontWeight(.bold)
 
-                Text("Importa documentos y pregunta lo que\nnecesites saber sobre ellos")
+                Text(lang.libraryEmptySubtitle)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -191,7 +248,7 @@ struct LibraryView: View {
                 Button {
                     viewModel.showImporter = true
                 } label: {
-                    Label("Importar archivos", systemImage: "folder.fill")
+                    Label(lang.libraryImportFiles, systemImage: "folder.fill")
                         .fontWeight(.semibold)
                         .frame(maxWidth: 220)
                 }
@@ -202,7 +259,7 @@ struct LibraryView: View {
                 Button {
                     viewModel.showCamera = true
                 } label: {
-                    Label("Escanear documento", systemImage: "camera.fill")
+                    Label(lang.libraryScanDocument, systemImage: "camera.fill")
                         .frame(maxWidth: 220)
                 }
                 .buttonStyle(.bordered)
@@ -219,11 +276,16 @@ struct LibraryView: View {
 
     private var contentGrid: some View {
         ScrollView {
+            // Processing banner
+            if viewModel.hasProcessingDocuments {
+                processingBanner
+            }
+
             // Item count header
             let totalItems = viewModel.folders.count + filteredDocuments.count
             if totalItems > 0 {
                 HStack {
-                    Text("\(totalItems) elemento\(totalItems == 1 ? "" : "s")")
+                    Text(lang.libraryItemCount(totalItems))
                         .font(.footnote)
                         .fontWeight(.medium)
                         .foregroundStyle(.secondary)
@@ -250,13 +312,13 @@ struct LibraryView: View {
                             renameFolderName = folder.name
                             folderToRename = folder
                         } label: {
-                            Label("Renombrar", systemImage: "pencil")
+                            Label(lang.libraryRename, systemImage: "pencil")
                         }
 
                         Button(role: .destructive) {
                             viewModel.deleteFolder(id: folder.id)
                         } label: {
-                            Label("Eliminar carpeta", systemImage: "trash")
+                            Label(lang.libraryDeleteFolder, systemImage: "trash")
                         }
                     }
                 }
@@ -272,21 +334,21 @@ struct LibraryView: View {
                             documentToMove = document.id
                             showMoveSheet = true
                         } label: {
-                            Label("Mover a carpeta", systemImage: "folder")
+                            Label(lang.libraryMoveToFolder, systemImage: "folder")
                         }
 
                         if viewModel.isInFolder {
                             Button {
                                 viewModel.moveDocument(document.id, toFolder: nil)
                             } label: {
-                                Label("Sacar de carpeta", systemImage: "arrow.up.doc")
+                                Label(lang.libraryRemoveFromFolder, systemImage: "arrow.up.doc")
                             }
                         }
 
                         Button(role: .destructive) {
                             viewModel.deleteDocument(id: document.id)
                         } label: {
-                            Label("Eliminar", systemImage: "trash")
+                            Label(lang.libraryDeleteDoc, systemImage: "trash")
                         }
                     }
                 }
@@ -312,7 +374,7 @@ struct LibraryView: View {
                         showMoveSheet = false
                         documentToMove = nil
                     } label: {
-                        Label("Raíz (sin carpeta)", systemImage: "house")
+                        Label(lang.libraryRootFolder, systemImage: "house")
                     }
                 }
 
@@ -329,15 +391,15 @@ struct LibraryView: View {
                 }
 
                 if viewModel.folders.isEmpty && !viewModel.isInFolder {
-                    Text("No hay carpetas. Crea una primero.")
+                    Text(lang.libraryNoFolders)
                         .foregroundStyle(.secondary)
                 }
             }
-            .navigationTitle("Mover a...")
+            .navigationTitle(lang.libraryMoveToTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancelar") {
+                    Button(lang.cancelButton) {
                         showMoveSheet = false
                         documentToMove = nil
                     }

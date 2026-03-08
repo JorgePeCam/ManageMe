@@ -4,32 +4,36 @@ struct OnboardingView: View {
     @Binding var hasCompletedOnboarding: Bool
     @State private var currentPage = 0
 
-    private let pages: [OnboardingPage] = [
-        OnboardingPage(
-            icon: "brain.head.profile",
-            title: "Tu segundo cerebro",
-            subtitle: "Guarda facturas, garantías, contratos y cualquier documento importante. ManageMe los organiza y los tiene siempre listos para ti.",
-            accentColor: .indigo
-        ),
-        OnboardingPage(
-            icon: "doc.text.magnifyingglass",
-            title: "Pregunta lo que quieras",
-            subtitle: "¿Cuánto pagué de luz? ¿Mi lavadora sigue en garantía? Pregunta en lenguaje natural y obtén respuestas al instante.",
-            accentColor: .purple
-        ),
-        OnboardingPage(
-            icon: "square.and.arrow.up",
-            title: "Importa desde cualquier app",
-            subtitle: "Comparte PDFs, fotos, documentos Word o Excel directamente desde cualquier aplicación usando el botón compartir.",
-            accentColor: .blue
-        ),
-        OnboardingPage(
-            icon: "lock.shield",
-            title: "Privacidad total",
-            subtitle: "Tus documentos se procesan en tu dispositivo con Apple Intelligence. Tus datos nunca salen de tu iPhone.",
-            accentColor: .green
-        ),
-    ]
+    private var lang: AppLanguage { AppLanguage.current }
+
+    private var pages: [OnboardingPage] {
+        [
+            OnboardingPage(
+                icon: "brain.head.profile",
+                title: lang.onboardingTitle1,
+                subtitle: lang.onboardingSubtitle1,
+                accentColor: .indigo
+            ),
+            OnboardingPage(
+                icon: "doc.text.magnifyingglass",
+                title: lang.onboardingTitle2,
+                subtitle: lang.onboardingSubtitle2,
+                accentColor: .purple
+            ),
+            OnboardingPage(
+                icon: "square.and.arrow.up",
+                title: lang.onboardingTitle3,
+                subtitle: lang.onboardingSubtitle3,
+                accentColor: .blue
+            ),
+            OnboardingPage(
+                icon: "lock.shield",
+                title: lang.onboardingTitle4,
+                subtitle: lang.onboardingSubtitle4,
+                accentColor: .green
+            ),
+        ]
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -108,7 +112,7 @@ struct OnboardingView: View {
                         hasCompletedOnboarding = true
                     }
                 } label: {
-                    Text("Empezar")
+                    Text(lang.onboardingStart)
                         .font(.headline)
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
@@ -119,7 +123,7 @@ struct OnboardingView: View {
                 .padding(.horizontal, AppStyle.paddingLarge)
             } else {
                 HStack {
-                    Button("Saltar") {
+                    Button(lang.onboardingSkip) {
                         withAnimation {
                             hasCompletedOnboarding = true
                         }
@@ -135,7 +139,7 @@ struct OnboardingView: View {
                         }
                     } label: {
                         HStack(spacing: 6) {
-                            Text("Siguiente")
+                            Text(lang.onboardingNext)
                                 .font(.subheadline)
                                 .fontWeight(.semibold)
 
