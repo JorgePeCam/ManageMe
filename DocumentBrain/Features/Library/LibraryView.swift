@@ -330,6 +330,15 @@ struct LibraryView: View {
                     }
                     .buttonStyle(.plain)
                     .contextMenu {
+                        if document.processingStatusEnum == .error {
+                            Button {
+                                viewModel.retryDocument(id: document.id)
+                            } label: {
+                                Label(lang.libraryRetry, systemImage: "arrow.clockwise")
+                            }
+                            Divider()
+                        }
+
                         Button {
                             documentToMove = document.id
                             showMoveSheet = true

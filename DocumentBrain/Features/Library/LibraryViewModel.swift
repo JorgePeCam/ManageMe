@@ -198,6 +198,17 @@ final class LibraryViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Retry
+
+    func retryDocument(id: String) {
+        Task {
+            try? await repository.updateStatus(id: id, status: .pending)
+            await loadDocuments()
+            await DocumentProcessor.shared.process(documentId: id)
+            await loadDocuments()
+        }
+    }
+
     // MARK: - Document CRUD
 
     func handleFileImport(result: Result<[URL], Error>) {

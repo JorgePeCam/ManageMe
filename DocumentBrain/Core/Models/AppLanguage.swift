@@ -360,6 +360,9 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     var libraryDeleteDoc: String {
         switch self { case .spanish: return "Eliminar"; case .english: return "Delete" }
     }
+    var libraryRetry: String {
+        switch self { case .spanish: return "Reintentar"; case .english: return "Retry" }
+    }
     var libraryRootFolder: String {
         switch self { case .spanish: return "Raíz (sin carpeta)"; case .english: return "Root (no folder)" }
     }

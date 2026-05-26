@@ -45,6 +45,8 @@ struct DocumentBrainApp: App {
                             await SharedInboxImporter.shared.importPendingFiles()
                             if needsStartupReindex {
                                 await SettingsViewModel.reindexAllDocuments()
+                            } else {
+                                await DocumentProcessor.shared.recoverStuckDocuments()
                             }
                         }
                 } else {
