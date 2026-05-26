@@ -218,12 +218,26 @@ final class ChatViewModel: ObservableObject {
 
             AppLogger.debug("[QA] Provider: \(qaService.activeProvider?.name ?? "NONE") available=\(qaService.hasAnyProvider)")
 
+            let debugInfo: RAGDebugInfo? = AppState.shared.isDebugMode ? RAGDebugInfo(
+                originalQuery: query,
+                expandedQuery: searchQuery,
+                provider: qaService.activeProvider?.name ?? "Extractive fallback",
+                results: results.prefix(12).map { r in
+                    RAGDebugResult(
+                        documentTitle: r.documentTitle,
+                        chunkIndex: r.chunkIndex,
+                        score: r.score,
+                        preview: String(r.chunkContent.prefix(120))
+                    )
+                }
+            ) : nil
+
             if qaService.hasAnyProvider {
                 var placeholderIndex: Int?
                 do {
                     if qaService.canStream {
                         placeholderIndex = messages.count
-                        let placeholderMsg = ChatMessage(content: "", isUser: false, citations: citations)
+                        let placeholderMsg = ChatMessage(content: "", isUser: false, citations: citations, debugInfo: debugInfo)
                         messages.append(placeholderMsg)
 
                         try await qaService.streamAnswer(
@@ -239,7 +253,8 @@ final class ChatViewModel: ObservableObject {
                                         id: placeholderMsg.id,
                                         content: partialText,
                                         isUser: false,
-                                        citations: citations
+                                        citations: citations,
+                                        debugInfo: debugInfo
                                     )
                                 }
                             }
@@ -251,7 +266,7 @@ final class ChatViewModel: ObservableObject {
                         }
                     } else {
                         let answer = try await qaService.answer(query: query, context: contextForAnswer, history: history)
-                        let msg = ChatMessage(content: answer, isUser: false, citations: citations)
+                        let msg = ChatMessage(content: answer, isUser: false, citations: citations, debugInfo: debugInfo)
                         messages.append(msg)
                         await persistBotMessage(msg)
                     }
@@ -259,11 +274,11 @@ final class ChatViewModel: ObservableObject {
                     AppLogger.debug("[QA] ⚠️ LLM failed, using extractive fallback. Error: \(error.localizedDescription)")
                     let answer = buildExtractiveAnswer(from: contextForAnswer, query: query)
                     if let placeholderIndex, placeholderIndex < messages.count {
-                        let msg = ChatMessage(id: messages[placeholderIndex].id, content: answer, isUser: false, citations: citations)
+                        let msg = ChatMessage(id: messages[placeholderIndex].id, content: answer, isUser: false, citations: citations, debugInfo: debugInfo)
                         messages[placeholderIndex] = msg
                         await persistBotMessage(msg)
                     } else {
-                        let msg = ChatMessage(content: answer, isUser: false, citations: citations)
+                        let msg = ChatMessage(content: answer, isUser: false, citations: citations, debugInfo: debugInfo)
                         messages.append(msg)
                         await persistBotMessage(msg)
                     }
@@ -271,7 +286,7 @@ final class ChatViewModel: ObservableObject {
             } else {
                 AppLogger.debug("[QA] ⚠️ No LLM provider — using extractive fallback")
                 let answer = buildExtractiveAnswer(from: contextForAnswer, query: query)
-                let msg = ChatMessage(content: answer, isUser: false, citations: citations)
+                let msg = ChatMessage(content: answer, isUser: false, citations: citations, debugInfo: debugInfo)
                 messages.append(msg)
                 await persistBotMessage(msg)
             }

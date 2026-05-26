@@ -132,6 +132,22 @@ struct SettingsView: View {
                     .buttonStyle(ListRowButtonStyle())
                 }
 
+                // Developer
+                Section {
+                    Toggle(isOn: Binding(
+                        get: { appState.isDebugMode },
+                        set: { appState.isDebugMode = $0 }
+                    )) {
+                        Label("RAG Debug", systemImage: "ant.fill")
+                            .foregroundStyle(appState.isDebugMode ? .orange : .primary)
+                    }
+                    .tint(.orange)
+                } header: {
+                    Text("Developer")
+                } footer: {
+                    Text("Muestra los fragmentos recuperados y sus scores bajo cada respuesta.")
+                }
+
                 // About
                 Section {
                     HStack {

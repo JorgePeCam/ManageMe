@@ -294,6 +294,10 @@ struct MessageBubble: View {
             if !message.citations.isEmpty {
                 citationsView
             }
+
+            if let debug = message.debugInfo, AppState.shared.isDebugMode {
+                RAGDebugPanel(debug: debug)
+            }
         }
         .sheet(item: $selectedCitation) { citation in
             CitationDetailView(citation: citation)
@@ -678,6 +682,133 @@ private struct ConversationGroup: Hashable {
 
     static func == (lhs: ConversationGroup, rhs: ConversationGroup) -> Bool {
         lhs.key == rhs.key
+    }
+}
+
+// MARK: - RAG Debug Panel
+
+struct RAGDebugPanel: View {
+    let debug: RAGDebugInfo
+    @State private var expanded = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) { expanded.toggle() }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "ant.fill")
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                    Text("RAG Debug")
+                        .font(.caption2)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.orange)
+                    Spacer()
+                    Text("\(debug.results.count) chunks")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(Color.orange.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+            .buttonStyle(.plain)
+
+            if expanded {
+                VStack(alignment: .leading, spacing: 10) {
+                    // Query info
+                    VStack(alignment: .leading, spacing: 3) {
+                        Label("Query", systemImage: "magnifyingglass")
+                            .font(.caption2)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.secondary)
+                        Text(debug.originalQuery)
+                            .font(.caption)
+                            .foregroundStyle(.primary)
+                        if debug.expandedQuery != debug.originalQuery {
+                            HStack(spacing: 4) {
+                                Image(systemName: "arrow.right")
+                                    .font(.caption2)
+                                    .foregroundStyle(.orange)
+                                Text(debug.expandedQuery)
+                                    .font(.caption)
+                                    .foregroundStyle(.orange)
+                            }
+                        }
+                    }
+
+                    // Provider
+                    HStack(spacing: 4) {
+                        Label("Provider", systemImage: "brain")
+                            .font(.caption2)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.secondary)
+                        Text(debug.provider)
+                            .font(.caption)
+                            .foregroundStyle(.primary)
+                    }
+
+                    Divider()
+
+                    // Chunks
+                    Label("Chunks recuperados", systemImage: "list.number")
+                        .font(.caption2)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.secondary)
+
+                    ForEach(debug.results) { result in
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 6) {
+                                // Score bar
+                                ZStack(alignment: .leading) {
+                                    Capsule().fill(Color.secondary.opacity(0.15)).frame(width: 60, height: 5)
+                                    Capsule().fill(scoreColor(result.score)).frame(width: CGFloat(result.score) * 60, height: 5)
+                                }
+                                Text(String(format: "%.0f%%", result.score * 100))
+                                    .font(.caption2)
+                                    .fontWeight(.medium)
+                                    .foregroundStyle(scoreColor(result.score))
+                                    .frame(width: 30, alignment: .trailing)
+                                Text(result.documentTitle)
+                                    .font(.caption2)
+                                    .foregroundStyle(.primary)
+                                    .lineLimit(1)
+                                if let idx = result.chunkIndex {
+                                    Text("#\(idx)")
+                                        .font(.caption2)
+                                        .foregroundStyle(.tertiary)
+                                }
+                            }
+                            Text(result.preview)
+                                .font(.system(size: 10))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                        }
+                        .padding(8)
+                        .background(Color.black.opacity(0.04))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                    }
+                }
+                .padding(10)
+                .background(Color.orange.opacity(0.04))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .padding(.top, 2)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func scoreColor(_ score: Float) -> Color {
+        switch score {
+        case 0.6...: return .green
+        case 0.4..<0.6: return .orange
+        default: return .red
+        }
     }
 }
 

@@ -124,13 +124,15 @@ struct ChatMessage: Identifiable {
     let isUser: Bool
     let timestamp: Date
     let citations: [Citation]
+    let debugInfo: RAGDebugInfo?
 
-    init(id: String = UUID().uuidString, content: String, isUser: Bool, citations: [Citation] = []) {
+    init(id: String = UUID().uuidString, content: String, isUser: Bool, citations: [Citation] = [], debugInfo: RAGDebugInfo? = nil) {
         self.id = id
         self.content = content
         self.isUser = isUser
         self.timestamp = Date()
         self.citations = citations
+        self.debugInfo = debugInfo
     }
 
     init(from persisted: PersistedChatMessage) {
@@ -139,7 +141,25 @@ struct ChatMessage: Identifiable {
         self.isUser = persisted.isUser
         self.timestamp = persisted.timestamp
         self.citations = persisted.citations
+        self.debugInfo = nil
     }
+}
+
+// MARK: - RAG Debug Info
+
+struct RAGDebugInfo {
+    let originalQuery: String
+    let expandedQuery: String
+    let provider: String
+    let results: [RAGDebugResult]
+}
+
+struct RAGDebugResult: Identifiable {
+    let id = UUID()
+    let documentTitle: String
+    let chunkIndex: Int?
+    let score: Float
+    let preview: String
 }
 
 // MARK: - Citation
