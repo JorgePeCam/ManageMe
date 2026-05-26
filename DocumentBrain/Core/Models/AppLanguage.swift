@@ -313,6 +313,67 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         switch self { case .spanish: return "Siguiente"; case .english: return "Next" }
     }
 
+    // Onboarding — API key step
+    var onboardingAPITitle: String {
+        switch self { case .spanish: return "Activa la IA"; case .english: return "Enable AI" }
+    }
+    var onboardingAPISubtitle: String {
+        switch self {
+        case .spanish: return "DocumentBrain usa Gemini de Google para responder preguntas. Añade tu clave gratuita para obtener respuestas de calidad."
+        case .english: return "DocumentBrain uses Google Gemini to answer questions. Add your free API key to get high-quality answers."
+        }
+    }
+    var onboardingAPIPlaceholder: String {
+        switch self { case .spanish: return "Pega tu clave API aquí"; case .english: return "Paste your API key here" }
+    }
+    var onboardingAPIGetKey: String {
+        switch self { case .spanish: return "Obtener clave gratuita →"; case .english: return "Get free API key →" }
+    }
+    var onboardingAPIVerify: String {
+        switch self { case .spanish: return "Verificar clave"; case .english: return "Verify key" }
+    }
+    var onboardingAPIVerifying: String {
+        switch self { case .spanish: return "Verificando..."; case .english: return "Verifying..." }
+    }
+    var onboardingAPIValid: String {
+        switch self { case .spanish: return "Clave válida"; case .english: return "Valid key" }
+    }
+    var onboardingAPIInvalid: String {
+        switch self { case .spanish: return "Clave no válida"; case .english: return "Invalid key" }
+    }
+    var onboardingAPISkip: String {
+        switch self { case .spanish: return "Ahora no, configurar después"; case .english: return "Not now, set up later" }
+    }
+    var onboardingAPIStart: String {
+        switch self { case .spanish: return "Empezar con IA activada"; case .english: return "Start with AI enabled" }
+    }
+
+    // Settings — Gemini API key section
+    var settingsGeminiTitle: String {
+        switch self { case .spanish: return "Gemini API"; case .english: return "Gemini API" }
+    }
+    var settingsGeminiConfigured: String {
+        switch self { case .spanish: return "Clave configurada"; case .english: return "Key configured" }
+    }
+    var settingsGeminiNotConfigured: String {
+        switch self { case .spanish: return "Sin clave API"; case .english: return "No API key" }
+    }
+    var settingsGeminiChange: String {
+        switch self { case .spanish: return "Cambiar clave"; case .english: return "Change key" }
+    }
+    var settingsGeminiRemove: String {
+        switch self { case .spanish: return "Eliminar clave"; case .english: return "Remove key" }
+    }
+    var settingsGeminiFooter: String {
+        switch self {
+        case .spanish: return "La clave se guarda de forma segura en el llavero de tu dispositivo y nunca sale del mismo."
+        case .english: return "The key is stored securely in your device's Keychain and never leaves it."
+        }
+    }
+    var settingsGeminiAddKey: String {
+        switch self { case .spanish: return "Añadir clave API"; case .english: return "Add API key" }
+    }
+
     // MARK: - Tabs
 
     var tabLibrary: String {

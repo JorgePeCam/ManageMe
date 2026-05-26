@@ -23,35 +23,33 @@ final class GeminiQAProvider: StreamableQAProvider {
     }
 
     private var apiKey: String {
-        // Priority 1: User-configured key in Keychain (legacy OpenAI or new Gemini)
-        let userKey = APIKeyStore.loadKey()
-        if !userKey.isEmpty { return userKey }
-
-        // Priority 2: Embedded app key (XOR-obfuscated)
-        return Self.embeddedKey
+        APIKeyStore.loadKey()
     }
 
-    // MARK: - Embedded Key (XOR obfuscation)
+    // MARK: - Key Verification
 
-    private static let obfuscationKey: UInt8 = 0xAB
+    /// Makes a minimal test call to verify a Gemini API key is valid.
+    static func verifyKey(_ key: String) async -> Bool {
+        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
 
-    /// XOR-obfuscated bytes of the Gemini API key.
-    /// Generate with: `print(GeminiQAProvider.obfuscate("AIza..."))`
-    private static let obfuscatedBytes: [UInt8] = [
-        0xEA, 0xE2, 0xD1, 0xCA, 0xF8, 0xD2, 0xEF, 0xE6, 0xE3, 0xF8,
-        0xC8, 0xD3, 0xEC, 0x99, 0xEE, 0x99, 0xC7, 0x86, 0xF2, 0xCC,
-        0xCD, 0xD9, 0xC0, 0xE7, 0xEA, 0xC3, 0xD2, 0xE4, 0xC0, 0xE2,
-        0xE2, 0xF1, 0xDC, 0x9D, 0xC7, 0x92, 0xC0, 0xE7, 0xE6
-    ]
+        guard let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=\(trimmed)") else { return false }
 
-    private static var embeddedKey: String {
-        guard !obfuscatedBytes.isEmpty else { return "" }
-        let decoded = obfuscatedBytes.map { $0 ^ obfuscationKey }
-        return String(bytes: decoded, encoding: .utf8) ?? ""
-    }
+        let body: [String: Any] = [
+            "contents": [["parts": [["text": "Hi"]]]],
+            "generationConfig": ["maxOutputTokens": 5]
+        ]
 
-    static func obfuscate(_ key: String) -> [UInt8] {
-        Array(key.utf8).map { $0 ^ obfuscationKey }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        request.timeoutInterval = 15
+
+        guard let (_, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse else { return false }
+
+        return http.statusCode == 200
     }
 
     // MARK: - Multi-turn builder
