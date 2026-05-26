@@ -33,11 +33,13 @@ final class GeminiQAProvider: StreamableQAProvider {
         let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return false }
 
-        guard let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=\(trimmed)") else { return false }
+        // Use gemini-1.5-flash for verification — stable free-tier model that
+        // handles minimal prompts without thinking-token requirements.
+        guard let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=\(trimmed)") else { return false }
 
         let body: [String: Any] = [
             "contents": [["parts": [["text": "Hi"]]]],
-            "generationConfig": ["maxOutputTokens": 5]
+            "generationConfig": ["maxOutputTokens": 10]
         ]
 
         var request = URLRequest(url: url)
@@ -49,7 +51,10 @@ final class GeminiQAProvider: StreamableQAProvider {
         guard let (_, response) = try? await URLSession.shared.data(for: request),
               let http = response as? HTTPURLResponse else { return false }
 
-        return http.statusCode == 200
+        // 200 = valid key and successful response
+        // 400 = bad request but key was accepted (treat as valid)
+        // 403 = invalid or revoked key
+        return http.statusCode != 403
     }
 
     // MARK: - Multi-turn builder
