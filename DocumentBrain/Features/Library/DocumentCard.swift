@@ -84,9 +84,14 @@ struct DocumentCard: View {
                 .foregroundStyle(Color.appSuccess)
                 .font(.caption)
         case .error:
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(Color.appDanger)
-                .font(.caption)
+            HStack(spacing: 3) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(Color.appDanger)
+                    .font(.caption)
+                Text("Error")
+                    .font(.caption2)
+                    .foregroundStyle(Color.appDanger)
+            }
         case .pending, .extracting, .chunking, .embedding:
             ProgressView()
                 .scaleEffect(0.7)

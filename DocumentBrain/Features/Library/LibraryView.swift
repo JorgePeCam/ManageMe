@@ -281,8 +281,18 @@ struct LibraryView: View {
                 processingBanner
             }
 
-            // Item count header
+            // Breadcrumb (only when navigated into a folder)
+            if viewModel.isInFolder {
+                breadcrumb
+            }
+
+            // Empty folder state
             let totalItems = viewModel.folders.count + filteredDocuments.count
+            if totalItems == 0 && viewModel.isInFolder {
+                emptyFolderState
+            }
+
+            // Item count header
             if totalItems > 0 {
                 HStack {
                     Text(lang.libraryItemCount(totalItems))
@@ -330,6 +340,15 @@ struct LibraryView: View {
                     }
                     .buttonStyle(.plain)
                     .contextMenu {
+                        if document.processingStatusEnum == .error {
+                            Button {
+                                viewModel.retryDocument(id: document.id)
+                            } label: {
+                                Label(lang.libraryRetry, systemImage: "arrow.clockwise")
+                            }
+                            Divider()
+                        }
+
                         Button {
                             documentToMove = document.id
                             showMoveSheet = true
@@ -361,36 +380,106 @@ struct LibraryView: View {
         }
     }
 
+    // MARK: - Breadcrumb
+
+    private var breadcrumb: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 4) {
+                Button {
+                    viewModel.navigateToRoot()
+                } label: {
+                    Text(lang.libraryTitle)
+                        .font(.caption)
+                        .foregroundStyle(Color.appAccent)
+                }
+
+                ForEach(Array(viewModel.folderPath.enumerated()), id: \.element.id) { index, folder in
+                    Image(systemName: "chevron.right")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+
+                    if index == viewModel.folderPath.count - 1 {
+                        Text(folder.name)
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundStyle(.primary)
+                    } else {
+                        Button {
+                            // Navigate to this level
+                            let newPath = Array(viewModel.folderPath.prefix(index + 1))
+                            viewModel.navigateToPath(newPath)
+                        } label: {
+                            Text(folder.name)
+                                .font(.caption)
+                                .foregroundStyle(Color.appAccent)
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, AppStyle.padding)
+            .padding(.vertical, 6)
+        }
+    }
+
+    // MARK: - Empty Folder State
+
+    private var emptyFolderState: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "folder")
+                .font(.system(size: 44, weight: .light))
+                .foregroundStyle(.tertiary)
+                .padding(.top, 40)
+
+            VStack(spacing: 6) {
+                Text(lang.libraryFolderEmpty)
+                    .font(.headline)
+                    .foregroundStyle(.secondary)
+                Text(lang.libraryFolderEmptySubtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(.tertiary)
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.bottom, 24)
+    }
+
     // MARK: - Move Sheet
 
     private var moveToFolderSheet: some View {
         NavigationStack {
             List {
-                if viewModel.isInFolder {
+                // Always show root as option
+                Button {
+                    if let docId = documentToMove {
+                        viewModel.moveDocument(docId, toFolder: nil)
+                    }
+                    showMoveSheet = false
+                    documentToMove = nil
+                } label: {
+                    Label(lang.libraryRootFolder, systemImage: "house")
+                }
+
+                // All folders hierarchically
+                ForEach(hierarchicalFolders, id: \.folder.id) { item in
                     Button {
                         if let docId = documentToMove {
-                            viewModel.moveDocument(docId, toFolder: nil)
+                            viewModel.moveDocument(docId, toFolder: item.folder.id)
                         }
                         showMoveSheet = false
                         documentToMove = nil
                     } label: {
-                        Label(lang.libraryRootFolder, systemImage: "house")
-                    }
-                }
-
-                ForEach(viewModel.folders) { folder in
-                    Button {
-                        if let docId = documentToMove {
-                            viewModel.moveDocument(docId, toFolder: folder.id)
+                        HStack(spacing: 4) {
+                            // Indentation for depth
+                            if item.depth > 0 {
+                                Color.clear.frame(width: CGFloat(item.depth) * 16)
+                            }
+                            Label(item.folder.name, systemImage: "folder.fill")
                         }
-                        showMoveSheet = false
-                        documentToMove = nil
-                    } label: {
-                        Label(folder.name, systemImage: "folder.fill")
                     }
                 }
 
-                if viewModel.folders.isEmpty && !viewModel.isInFolder {
+                if viewModel.allFolders.isEmpty {
                     Text(lang.libraryNoFolders)
                         .foregroundStyle(.secondary)
                 }
@@ -415,5 +504,23 @@ struct LibraryView: View {
         let docs = viewModel.filteredDocuments
         if searchText.isEmpty { return docs }
         return docs.filter { $0.title.localizedCaseInsensitiveContains(searchText) }
+    }
+
+    private struct HierarchicalFolder {
+        let folder: Folder
+        let depth: Int
+    }
+
+    private var hierarchicalFolders: [HierarchicalFolder] {
+        func children(of parentId: String?, depth: Int) -> [HierarchicalFolder] {
+            viewModel.allFolders
+                .filter { $0.parentFolderId == parentId }
+                .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+                .flatMap { folder in
+                    [HierarchicalFolder(folder: folder, depth: depth)] +
+                    children(of: folder.id, depth: depth + 1)
+                }
+        }
+        return children(of: nil, depth: 0)
     }
 }

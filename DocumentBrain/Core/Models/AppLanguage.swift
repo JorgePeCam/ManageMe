@@ -360,6 +360,9 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     var libraryDeleteDoc: String {
         switch self { case .spanish: return "Eliminar"; case .english: return "Delete" }
     }
+    var libraryRetry: String {
+        switch self { case .spanish: return "Reintentar"; case .english: return "Retry" }
+    }
     var libraryRootFolder: String {
         switch self { case .spanish: return "Raíz (sin carpeta)"; case .english: return "Root (no folder)" }
     }
@@ -368,6 +371,12 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     }
     var libraryMoveToTitle: String {
         switch self { case .spanish: return "Mover a..."; case .english: return "Move to..." }
+    }
+    var libraryFolderEmpty: String {
+        switch self { case .spanish: return "Carpeta vacía"; case .english: return "Empty folder" }
+    }
+    var libraryFolderEmptySubtitle: String {
+        switch self { case .spanish: return "Importa archivos o mueve documentos aquí"; case .english: return "Import files or move documents here" }
     }
     var libraryEmptyTitle: String {
         switch self { case .spanish: return "Tu segundo cerebro"; case .english: return "Your second brain" }
@@ -485,6 +494,12 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     }
     var chatSources: String {
         switch self { case .spanish: return "Fuentes"; case .english: return "Sources" }
+    }
+    var chatSourceFragment: String {
+        switch self { case .spanish: return "Fragmento del documento"; case .english: return "Document fragment" }
+    }
+    var chatRelevance: String {
+        switch self { case .spanish: return "relevancia"; case .english: return "relevance" }
     }
     var chatDeleteAction: String {
         switch self { case .spanish: return "Borrar"; case .english: return "Delete" }
