@@ -1,4 +1,4 @@
-# Revisión rápida del proyecto ManageMe
+# Revisión rápida del proyecto DocumentBrain
 
 ## Lo que está muy bien
 

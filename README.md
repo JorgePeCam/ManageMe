@@ -1,6 +1,6 @@
-# ManageMe
+# DocumentBrain
 
-ManageMe es una app iOS para **organizar documentos y hacer preguntas sobre su contenido** con búsqueda semántica local.
+DocumentBrain es una app iOS para **organizar documentos y hacer preguntas sobre su contenido** con búsqueda semántica local.
 
 Importas archivos, la app extrae texto, lo trocea, genera embeddings y luego responde en chat con citas.
 
@@ -10,7 +10,7 @@ Importas archivos, la app extrae texto, lo trocea, genera embeddings y luego res
 
 Cuando tienes información repartida en PDFs, fotos y documentos ofimáticos, recuperar una respuesta concreta es lento.
 
-ManageMe te permite:
+DocumentBrain te permite:
 
 - centralizar tus archivos en una biblioteca,
 - organizarlos en carpetas,
@@ -23,7 +23,7 @@ ManageMe te permite:
 
 - Biblioteca con documentos y **carpetas** (crear, renombrar, borrar, navegar, mover documentos).
 - Importación desde archivos y cámara.
-- **Share Extension** para compartir archivos y contenido desde otras apps a ManageMe.
+- **Share Extension** para compartir archivos y contenido desde otras apps a DocumentBrain.
 - Procesamiento automático:
   - extracción de texto,
   - chunking,
@@ -59,9 +59,9 @@ ManageMe te permite:
 ### Estructura general
 
 ```text
-ManageMe.xcodeproj/          # Proyecto Xcode y esquemas de build
-ManageMe/                    # App principal
-├── ManageMeApp.swift        # Entry point: arranca SyncCoordinator y decide Onboarding/MainTab
+DocumentBrain.xcodeproj/          # Proyecto Xcode y esquemas de build
+DocumentBrain/                    # App principal
+├── DocumentBrainApp.swift        # Entry point: arranca SyncCoordinator y decide Onboarding/MainTab
 ├── Core/                    # Capa de negocio (sin UI)
 │   ├── Models/              # Entidades del dominio
 │   ├── Database/            # Persistencia local con GRDB/SQLite
@@ -77,9 +77,9 @@ ManageMe/                    # App principal
 │   └── Import/              # ImagePicker (cámara/galería)
 ├── AI/                      # Tokenizer y matemática vectorial
 └── Assets.xcassets          # Iconos y colores
-ManageMeShareExtension/      # Extensión para compartir desde otras apps
-ManageMeTests/               # Tests unitarios
-ManageMeUITests/             # Tests de UI
+DocumentBrainShareExtension/      # Extensión para compartir desde otras apps
+DocumentBrainTests/               # Tests unitarios
+DocumentBrainUITests/             # Tests de UI
 ```
 
 ### `Core/Models/` — Entidades
@@ -147,7 +147,7 @@ Cada feature sigue el patrón `View` + `ViewModel`:
 | `Onboarding/` | Pantalla inicial al primer arranque |
 | `Import/` | `ImagePicker` para cámara/galería |
 
-### `ManageMeShareExtension/`
+### `DocumentBrainShareExtension/`
 
 `ShareViewController.swift` recibe ficheros y URLs compartidos desde otras apps (Safari, Mail, WhatsApp…) y los deposita en el inbox compartido vía App Group. Al activar la app, `SharedInboxImporter` los procesa.
 
@@ -189,7 +189,7 @@ El idioma de la respuesta sigue al idioma activo de la app (`AppLanguage`).
 
 ## Sincronización iCloud
 
-ManageMe incluye sincronización bidireccional con CloudKit (base de datos privada del usuario):
+DocumentBrain incluye sincronización bidireccional con CloudKit (base de datos privada del usuario):
 
 - sincroniza documentos, carpetas, conversaciones y mensajes,
 - mantiene una cola local de cambios pendientes,
@@ -205,13 +205,13 @@ Requisitos:
 
 ## Share Extension
 
-ManageMe incluye una extensión de compartir para guardar contenido sin abrir la app manualmente.
+DocumentBrain incluye una extensión de compartir para guardar contenido sin abrir la app manualmente.
 
 Flujo:
 
-1. Desde Safari, Mail, WhatsApp u otra app, usa Compartir -> `Guardar en ManageMe`.
+1. Desde Safari, Mail, WhatsApp u otra app, usa Compartir -> `Guardar en DocumentBrain`.
 2. La extensión copia el contenido compartido a un inbox compartido (`App Group`).
-3. Al abrir/activar ManageMe, la app importa ese inbox y lanza su pipeline normal (extract -> chunk -> embeddings).
+3. Al abrir/activar DocumentBrain, la app importa ese inbox y lanza su pipeline normal (extract -> chunk -> embeddings).
 
 ---
 
@@ -233,8 +233,8 @@ Requisitos:
 Comandos útiles:
 
 ```bash
-xcodebuild -list -project ManageMe.xcodeproj
-xcodebuild test -project ManageMe.xcodeproj -scheme ManageMe -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.1'
+xcodebuild -list -project DocumentBrain.xcodeproj
+xcodebuild test -project DocumentBrain.xcodeproj -scheme DocumentBrain -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.1'
 ```
 
 ---
