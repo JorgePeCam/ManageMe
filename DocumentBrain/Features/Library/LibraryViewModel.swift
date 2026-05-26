@@ -42,6 +42,7 @@ final class LibraryViewModel: ObservableObject {
     @Published var currentFolderId: String?
     @Published var folderPath: [Folder] = []
     @Published var documentCounts: [String: Int] = [:]
+    @Published var allFolders: [Folder] = []
 
     private let repository = DocumentRepository()
     private let folderRepository = FolderRepository()
@@ -110,6 +111,9 @@ final class LibraryViewModel: ObservableObject {
                 counts[folder.id] = try await folderRepository.documentCount(folderId: folder.id)
             }
             documentCounts = counts
+
+            // Load all folders for the move picker
+            allFolders = try await folderRepository.fetchAll()
         } catch {
             AppLogger.error("Error cargando documentos: \(error.localizedDescription)")
             userErrorMessage = AppLanguage.current.errorLoadDocuments
@@ -134,6 +138,12 @@ final class LibraryViewModel: ObservableObject {
     func navigateToRoot() {
         folderPath = []
         currentFolderId = nil
+        Task { await loadDocuments() }
+    }
+
+    func navigateToPath(_ path: [Folder]) {
+        folderPath = path
+        currentFolderId = path.last?.id
         Task { await loadDocuments() }
     }
 

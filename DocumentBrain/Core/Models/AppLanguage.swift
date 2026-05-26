@@ -372,6 +372,12 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     var libraryMoveToTitle: String {
         switch self { case .spanish: return "Mover a..."; case .english: return "Move to..." }
     }
+    var libraryFolderEmpty: String {
+        switch self { case .spanish: return "Carpeta vacía"; case .english: return "Empty folder" }
+    }
+    var libraryFolderEmptySubtitle: String {
+        switch self { case .spanish: return "Importa archivos o mueve documentos aquí"; case .english: return "Import files or move documents here" }
+    }
     var libraryEmptyTitle: String {
         switch self { case .spanish: return "Tu segundo cerebro"; case .english: return "Your second brain" }
     }
