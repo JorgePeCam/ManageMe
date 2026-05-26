@@ -138,7 +138,7 @@ struct ChunkingService {
             if ".!?\n".contains(char) {
                 // Avoid splitting on abbreviations like "Sr." or decimal numbers
                 let next = text.index(text.startIndex, offsetBy: i + 1, limitedBy: text.endIndex)
-                let nextChar = next.map { text[$0] }
+                let nextChar: Character? = next.flatMap { $0 < text.endIndex ? text[$0] : nil }
                 let isAbbreviation = nextChar?.isLetter == true
                 if !isAbbreviation {
                     let trimmed = current.trimmingCharacters(in: .whitespaces)
