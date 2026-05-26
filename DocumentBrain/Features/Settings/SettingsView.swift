@@ -1,7 +1,18 @@
 import SwiftUI
 
+/// Button style with a subtle scale + opacity tap animation for List rows.
+private struct ListRowButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+            .opacity(configuration.isPressed ? 0.6 : 1.0)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+    }
+}
+
 struct SettingsView: View {
     @StateObject private var viewModel = SettingsViewModel()
+    @State private var appState = AppState.shared
 
     private var lang: AppLanguage { viewModel.lang }
 
@@ -27,6 +38,7 @@ struct SettingsView: View {
                                 }
                             }
                         }
+                        .buttonStyle(ListRowButtonStyle())
                     }
                 } header: {
                     Text(lang.languageSectionTitle)
@@ -99,15 +111,25 @@ struct SettingsView: View {
                     Button {
                         viewModel.reindexAll()
                     } label: {
-                        Label(lang.reindexLabel, systemImage: "arrow.clockwise")
-                            .foregroundStyle(Color.appAccent)
+                        HStack {
+                            Label(lang.reindexLabel, systemImage: "arrow.clockwise")
+                                .foregroundStyle(appState.isReindexing ? Color.secondary : Color.appAccent)
+                            Spacer()
+                            if appState.isReindexing {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                            }
+                        }
                     }
+                    .buttonStyle(ListRowButtonStyle())
+                    .disabled(appState.isReindexing)
 
                     Button(role: .destructive) {
                         viewModel.showDeleteConfirmation = true
                     } label: {
                         Label(lang.deleteAllLabel, systemImage: "trash")
                     }
+                    .buttonStyle(ListRowButtonStyle())
                 }
 
                 // About

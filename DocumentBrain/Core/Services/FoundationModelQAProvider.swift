@@ -18,16 +18,15 @@ final class FoundationModelQAProvider: StreamableQAProvider {
         #endif
     }
 
-    func answer(query: String, context: [SearchResult]) async throws -> String {
+    func answer(query: String, context: [SearchResult], history: [ConversationTurn] = []) async throws -> String {
         #if canImport(FoundationModels)
-        // Try with richer context first, then progressively reduce if needed.
         do {
-            return try await generate(query: query, context: context, maxChunks: 10, maxChars: 1500)
+            return try await generate(query: query, context: context, history: history, maxChunks: 10, maxChars: 1500)
         } catch {
             do {
-                return try await generate(query: query, context: context, maxChunks: 6, maxChars: 1200)
+                return try await generate(query: query, context: context, history: history, maxChunks: 6, maxChars: 1200)
             } catch {
-                return try await generate(query: query, context: context, maxChunks: 3, maxChars: 800)
+                return try await generate(query: query, context: context, history: history, maxChunks: 3, maxChars: 800)
             }
         }
         #else
@@ -35,9 +34,9 @@ final class FoundationModelQAProvider: StreamableQAProvider {
         #endif
     }
 
-    func streamAnswer(query: String, context: [SearchResult], onUpdate: @escaping (String) -> Void) async throws {
+    func streamAnswer(query: String, context: [SearchResult], history: [ConversationTurn] = [], onUpdate: @escaping (String) -> Void) async throws {
         #if canImport(FoundationModels)
-        let prompt = buildPrompt(query: query, context: context, maxChunks: 10, maxChars: 1500)
+        let prompt = buildPrompt(query: query, context: context, history: history, maxChunks: 10, maxChars: 1500)
         let session = LanguageModelSession(instructions: Self.instructions)
 
         do {
@@ -46,7 +45,6 @@ final class FoundationModelQAProvider: StreamableQAProvider {
                 onUpdate(partial.content)
             }
         } catch {
-            // Streaming failed — try non-streaming as fallback
             let response = try await session.respond(to: prompt)
             onUpdate(response.content)
         }
@@ -58,23 +56,33 @@ final class FoundationModelQAProvider: StreamableQAProvider {
     // MARK: - Private
 
     #if canImport(FoundationModels)
-    private func generate(query: String, context: [SearchResult], maxChunks: Int, maxChars: Int) async throws -> String {
-        let prompt = buildPrompt(query: query, context: context, maxChunks: maxChunks, maxChars: maxChars)
+    private func generate(query: String, context: [SearchResult], history: [ConversationTurn], maxChunks: Int, maxChars: Int) async throws -> String {
+        let prompt = buildPrompt(query: query, context: context, history: history, maxChunks: maxChunks, maxChars: maxChars)
         let session = LanguageModelSession(instructions: Self.instructions)
         let response = try await session.respond(to: prompt)
         return response.content
     }
     #endif
 
-    /// Uses the shared AppLanguage system prompt for consistency with Gemini
-    private static var instructions: String {
-        AppLanguage.current.systemPrompt
-    }
+    private static var instructions: String { AppLanguage.current.systemPrompt }
 
-    private func buildPrompt(query: String, context: [SearchResult], maxChunks: Int, maxChars: Int) -> String {
+    private func buildPrompt(query: String, context: [SearchResult], history: [ConversationTurn], maxChunks: Int, maxChars: Int) -> String {
         let lang = AppLanguage.current
+        var prompt = ""
+
+        if !history.isEmpty {
+            let historyLabel = lang == .spanish ? "CONVERSACIÓN PREVIA" : "PREVIOUS CONVERSATION"
+            prompt += "\(historyLabel):\n"
+            for turn in history {
+                let userLabel = lang == .spanish ? "Usuario" : "User"
+                let assistantLabel = lang == .spanish ? "Asistente" : "Assistant"
+                prompt += "\(userLabel): \(turn.userMessage)\n"
+                prompt += "\(assistantLabel): \(turn.assistantMessage)\n\n"
+            }
+        }
+
         let chunks = context.prefix(maxChunks)
-        var prompt = "\(lang.snippetsHeader)\n\n"
+        prompt += "\(lang.snippetsHeader)\n\n"
         for (idx, result) in chunks.enumerated() {
             let text = String(result.chunkContent.prefix(maxChars))
             prompt += "\(lang.snippetLabel(title: result.documentTitle, index: idx + 1))\n\(text)\n\n"

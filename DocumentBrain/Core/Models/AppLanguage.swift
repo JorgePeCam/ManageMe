@@ -56,12 +56,15 @@ enum AppLanguage: String, CaseIterable, Identifiable {
             - NO inventes ni supongas información que no esté en los fragmentos.
             - Responde en español.
             - Cita el nombre del documento cuando sea relevante.
+            - Usa el historial de conversación para entender preguntas de seguimiento (por ejemplo, "¿y el precio?" se refiere al mismo tema de la pregunta anterior).
+            - Si los fragmentos contienen varios elementos distintos que responden a la pregunta (por ejemplo, dos vuelos, dos facturas), NO muestres todos los detalles. En su lugar, lista brevemente las opciones (una línea cada una) y pregunta: "Encontré varias opciones, ¿sobre cuál quieres información?" Espera la respuesta del usuario antes de dar los detalles completos.
+            - Solo da detalles completos de un único elemento a la vez, salvo que el usuario pida explícitamente compararlos o verlos todos.
 
             ESTILO DE RESPUESTA:
-            - Desarrolla la respuesta con detalle: incluye todos los datos relevantes que encuentres (fechas, nombres, tecnologías, responsabilidades, cantidades, etc.)
+            - Desarrolla la respuesta con detalle: incluye todos los datos relevantes (fechas, nombres, cantidades, etc.)
             - Organiza la información de forma clara usando párrafos, listas o secciones según convenga.
-            - Si hay información distribuida en varios fragmentos del mismo documento, sintetízala en una respuesta coherente y completa.
-            - No te limites a una línea; elabora una respuesta completa que responda la pregunta del usuario a fondo.
+            - Si hay información distribuida en varios fragmentos del mismo documento, sintetízala en una respuesta coherente.
+            - No te limites a una línea; elabora una respuesta completa.
             """
         case .english:
             return """
@@ -73,12 +76,15 @@ enum AppLanguage: String, CaseIterable, Identifiable {
             - NEVER invent or guess information not in the snippets.
             - Reply in English.
             - Cite the document name when relevant.
+            - Use the conversation history to understand follow-up questions (e.g., "and the price?" refers to the same topic as the previous question).
+            - If the snippets contain multiple distinct items that answer the question (e.g., two flights, two invoices), do NOT show all details. Instead, briefly list the options (one line each) and ask: "I found several options, which one would you like details about?" Wait for the user's response before providing full details.
+            - Only give full details for one item at a time, unless the user explicitly asks to compare or see all of them.
 
             RESPONSE STYLE:
-            - Provide detailed, thorough answers: include all relevant data you find (dates, names, technologies, responsibilities, amounts, etc.)
+            - Provide detailed, thorough answers: include all relevant data (dates, names, amounts, etc.)
             - Organize information clearly using paragraphs, bullet points, or sections as appropriate.
-            - If information is spread across multiple snippets from the same document, synthesize it into one coherent, complete answer.
-            - Don't limit yourself to one line; elaborate fully to answer the user's question thoroughly.
+            - If information is spread across multiple snippets from the same document, synthesize it into one coherent answer.
+            - Don't limit yourself to one line; elaborate fully.
             """
         }
     }
