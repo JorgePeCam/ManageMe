@@ -52,10 +52,13 @@ struct OnboardingView: View {
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
             .animation(.easeInOut(duration: 0.3), value: currentPage)
+            .background(Color.appCardSecondary)
 
             bottomSection
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.appCardSecondary)
+        .ignoresSafeArea(edges: .bottom)
     }
 
     // MARK: - Page View
