@@ -486,6 +486,12 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     var chatSources: String {
         switch self { case .spanish: return "Fuentes"; case .english: return "Sources" }
     }
+    var chatSourceFragment: String {
+        switch self { case .spanish: return "Fragmento del documento"; case .english: return "Document fragment" }
+    }
+    var chatRelevance: String {
+        switch self { case .spanish: return "relevancia"; case .english: return "relevance" }
+    }
     var chatDeleteAction: String {
         switch self { case .spanish: return "Borrar"; case .english: return "Delete" }
     }

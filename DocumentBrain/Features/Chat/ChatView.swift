@@ -257,6 +257,7 @@ struct ChatView: View {
 
 struct MessageBubble: View {
     let message: ChatMessage
+    @State private var selectedCitation: Citation?
 
     var body: some View {
         VStack(alignment: message.isUser ? .trailing : .leading, spacing: 8) {
@@ -271,31 +272,25 @@ struct MessageBubble: View {
                         .foregroundStyle(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 18))
                 } else {
-                    Text(Self.markdownContent(message.content))
+                    MarkdownRenderer(text: message.content)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 12)
                         .background(Color.appCard)
-                        .foregroundStyle(.primary)
                         .clipShape(RoundedRectangle(cornerRadius: 18))
                         .shadow(color: .black.opacity(0.04), radius: 3, y: 1)
+                        .textSelection(.enabled)
                 }
 
                 if !message.isUser { Spacer(minLength: 48) }
             }
 
-            // Citations
             if !message.citations.isEmpty {
                 citationsView
             }
         }
-    }
-
-    /// Parse markdown for bot messages with fallback to plain text
-    private static func markdownContent(_ content: String) -> AttributedString {
-        (try? AttributedString(
-            markdown: content,
-            options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
-        )) ?? AttributedString(content)
+        .sheet(item: $selectedCitation) { citation in
+            CitationDetailView(citation: citation)
+        }
     }
 
     private var citationsView: some View {
@@ -308,30 +303,225 @@ struct MessageBubble: View {
                 .tracking(0.5)
 
             ForEach(message.citations) { citation in
-                HStack(spacing: 8) {
-                    Image(systemName: "doc.text.fill")
-                        .font(.caption2)
-                        .foregroundStyle(Color.appAccent)
+                Button {
+                    selectedCitation = citation
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "doc.text.fill")
+                            .font(.caption2)
+                            .foregroundStyle(Color.appAccent)
 
-                    Text(citation.documentTitle)
-                        .font(.caption)
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
+                        Text(citation.documentTitle)
+                            .font(.caption)
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
 
-                    Spacer()
+                        Spacer()
 
-                    Text("\(Int(citation.score * 100))%")
-                        .font(.caption2)
-                        .fontWeight(.medium)
-                        .foregroundStyle(Color.appAccent)
+                        Text("\(Int(citation.score * 100))%")
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                            .foregroundStyle(Color.appAccent)
+
+                        Image(systemName: "chevron.right")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color.appAccentLight)
+                    .clipShape(RoundedRectangle(cornerRadius: AppStyle.cornerRadiusSmall))
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(Color.appAccentLight)
-                .clipShape(RoundedRectangle(cornerRadius: AppStyle.cornerRadiusSmall))
+                .buttonStyle(.plain)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+// MARK: - Citation Detail
+
+struct CitationDetailView: View {
+    let citation: Citation
+    @Environment(\.dismiss) private var dismiss
+    private var lang: AppLanguage { AppLanguage.current }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack(spacing: 10) {
+                        Image(systemName: "doc.text.fill")
+                            .foregroundStyle(Color.appAccent)
+                        Text(citation.documentTitle)
+                            .font(.headline)
+                            .lineLimit(2)
+                        Spacer()
+                        Text("\(Int(citation.score * 100))% \(lang.chatRelevance)")
+                            .font(.caption)
+                            .foregroundStyle(Color.appAccent)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.appAccentLight)
+                            .clipShape(Capsule())
+                    }
+
+                    Divider()
+
+                    Text(citation.chunkContent)
+                        .font(.body)
+                        .foregroundStyle(.primary)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding()
+            }
+            .background(Color.appCardSecondary)
+            .navigationTitle(lang.chatSourceFragment)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(lang.cancelButton) { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Markdown Renderer
+
+struct MarkdownRenderer: View {
+    let text: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
+                blockView(for: block)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private enum Block {
+        case paragraph(String)
+        case heading(level: Int, text: String)
+        case bullet(text: String)
+        case numbered(n: Int, text: String)
+        case codeBlock(code: String)
+        case rule
+    }
+
+    private var blocks: [Block] {
+        var result: [Block] = []
+        var paragraphLines: [String] = []
+        var codeLines: [String] = []
+        var inCode = false
+
+        func flushParagraph() {
+            let joined = paragraphLines.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+            if !joined.isEmpty { result.append(.paragraph(joined)) }
+            paragraphLines = []
+        }
+
+        for line in text.components(separatedBy: "\n") {
+            if line.hasPrefix("```") {
+                if inCode {
+                    result.append(.codeBlock(code: codeLines.joined(separator: "\n")))
+                    codeLines = []
+                    inCode = false
+                } else {
+                    flushParagraph()
+                    inCode = true
+                }
+                continue
+            }
+            if inCode { codeLines.append(line); continue }
+
+            let t = line.trimmingCharacters(in: .whitespaces)
+
+            if t.isEmpty { flushParagraph(); continue }
+
+            if t.hasPrefix("### ") {
+                flushParagraph(); result.append(.heading(level: 3, text: String(t.dropFirst(4)))); continue
+            }
+            if t.hasPrefix("## ") {
+                flushParagraph(); result.append(.heading(level: 2, text: String(t.dropFirst(3)))); continue
+            }
+            if t.hasPrefix("# ") {
+                flushParagraph(); result.append(.heading(level: 1, text: String(t.dropFirst(2)))); continue
+            }
+            if t.hasPrefix("- ") || t.hasPrefix("* ") || t.hasPrefix("• ") {
+                flushParagraph(); result.append(.bullet(text: String(t.dropFirst(2)))); continue
+            }
+            if t == "---" || t == "***" || t == "___" {
+                flushParagraph(); result.append(.rule); continue
+            }
+            if let (n, rest) = numberedItem(t) {
+                flushParagraph(); result.append(.numbered(n: n, text: rest)); continue
+            }
+
+            paragraphLines.append(t)
+        }
+        flushParagraph()
+        return result
+    }
+
+    @ViewBuilder
+    private func blockView(for block: Block) -> some View {
+        switch block {
+        case .paragraph(let t):
+            Text(inline(t))
+                .fixedSize(horizontal: false, vertical: true)
+
+        case .heading(let level, let t):
+            Text(inline(t))
+                .font(level == 1 ? .title3.bold() : level == 2 ? .headline : .subheadline.bold())
+                .padding(.top, level < 3 ? 4 : 2)
+
+        case .bullet(let t):
+            HStack(alignment: .top, spacing: 8) {
+                Text("•")
+                    .foregroundStyle(Color.appAccent)
+                    .padding(.top, 1)
+                Text(inline(t))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+        case .numbered(let n, let t):
+            HStack(alignment: .top, spacing: 6) {
+                Text("\(n).")
+                    .foregroundStyle(Color.appAccent)
+                    .monospacedDigit()
+                    .padding(.top, 1)
+                Text(inline(t))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+        case .codeBlock(let code):
+            Text(code)
+                .font(.system(.caption, design: .monospaced))
+                .padding(10)
+                .background(Color.black.opacity(0.06))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+        case .rule:
+            Divider().padding(.vertical, 4)
+        }
+    }
+
+    private func inline(_ text: String) -> AttributedString {
+        (try? AttributedString(
+            markdown: text,
+            options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+        )) ?? AttributedString(text)
+    }
+
+    private func numberedItem(_ line: String) -> (Int, String)? {
+        guard let dotRange = line.range(of: ". ") else { return nil }
+        let prefix = String(line[line.startIndex..<dotRange.lowerBound])
+        guard let n = Int(prefix), n > 0 else { return nil }
+        return (n, String(line[dotRange.upperBound...]))
     }
 }
 
