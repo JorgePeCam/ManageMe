@@ -21,25 +21,29 @@ DocumentBrain te permite:
 
 ## Funcionalidades actuales
 
-- Biblioteca con documentos y **carpetas** (crear, renombrar, borrar, navegar, mover documentos).
+- Biblioteca con documentos y **carpetas** (crear, renombrar, borrar, navegar con breadcrumb, mover documentos a cualquier nivel de la jerarquía).
 - Importación desde archivos y cámara.
 - **Share Extension** para compartir archivos y contenido desde otras apps a DocumentBrain.
-- Procesamiento automático:
-  - extracción de texto,
-  - chunking,
-  - embeddings,
+- Procesamiento automático con **reintentos** (hasta 3 intentos con backoff) y **recuperación de fallos** al arrancar:
+  - extracción de texto (PDF nativo + OCR, DOCX, XLSX, imágenes),
+  - chunking semántico por párrafos con solapamiento,
+  - embeddings con `multi-qa-MiniLM-L6-cos-v1` (384 dim, optimizado para Q&A),
   - persistencia en SQLite.
 - Búsqueda híbrida:
   - similitud semántica (coseno),
   - FTS5 por keywords.
 - Chat con:
-  - respuestas con citas,
+  - contexto conversacional (últimas 3 rondas + expansión de query corta),
+  - desambiguación automática cuando hay múltiples elementos distintos,
+  - respuestas con **markdown completo** (headers, listas, código),
+  - citas tapeables que muestran el fragmento original del documento,
   - streaming cuando el proveedor lo permite,
   - fallback extractivo si falla IA.
+- **Panel de debug RAG** (activable en Ajustes › Developer): muestra los chunks recuperados con sus scores, query expandida y proveedor usado.
 - Ajustes de mantenimiento:
   - estado de IA/proveedor activo,
   - estado de sincronización iCloud,
-  - reindexado,
+  - reindexado con overlay de progreso (también automático al detectar cambio de modelo),
   - borrado total de datos.
 
 ---
@@ -88,8 +92,9 @@ DocumentBrainUITests/             # Tests de UI
 |---|---|
 | `Document.swift` | Documento importado (PDF, imagen, DOCX, etc.) |
 | `DocumentChunk.swift` | Fragmento de texto con su embedding vectorial |
-| `Folder.swift` | Carpeta que agrupa documentos |
-| `Conversation.swift` | Historial de chat y mensajes |
+| `Folder.swift` | Carpeta que agrupa documentos (soporta anidamiento) |
+| `Conversation.swift` | Historial de chat, mensajes, citas y debug RAG |
+| `AppState.swift` | Estado global compartido (progreso de reindexado, modo debug) |
 | `AppLanguage.swift` | Soporte ES/EN (prompts, etiquetas, idioma activo) |
 | `Extensions.swift` | Helpers comunes |
 
@@ -108,11 +113,11 @@ DocumentBrainUITests/             # Tests de UI
 | Fichero | Responsabilidad |
 |---|---|
 | `TextExtractionService.swift` | Extrae texto de PDF, imágenes (OCR Vision), DOCX, XLSX, ZIP |
-| `ChunkingService.swift` | Divide el texto en fragmentos solapados |
-| `EmbeddingService.swift` | Genera embeddings vectoriales de los chunks |
-| `DocumentProcessor.swift` | Orquesta el pipeline: extracción → chunking → embeddings |
+| `ChunkingService.swift` | Chunking semántico por párrafos (~200 tokens, overlap de último párrafo) |
+| `EmbeddingService.swift` | Embeddings con `multi-qa-MiniLM-L6-cos-v1` (384 dim, CoreML) |
+| `DocumentProcessor.swift` | Pipeline extracción → chunking → embeddings, con hasta 3 reintentos y recuperación de documentos atascados al arrancar |
 | `QAService.swift` | Cadena de fallback de proveedores de respuesta |
-| `GeminiQAProvider.swift` | Proveedor cloud Gemini Flash (con streaming) |
+| `GeminiQAProvider.swift` | Proveedor cloud Gemini Flash (multi-turn + streaming) |
 | `FoundationModelQAProvider.swift` | Proveedor on-device Apple Intelligence (iOS 26+) |
 | `SharedInboxImporter.swift` | Importa ficheros de la Share Extension al abrir la app |
 | `ThumbnailService.swift` | Genera miniaturas de documentos |
@@ -140,11 +145,11 @@ Cada feature sigue el patrón `View` + `ViewModel`:
 
 | Feature | Función |
 |---|---|
-| `Library/` | Biblioteca con tabs, carpetas, búsqueda y tarjetas de documento |
-| `Chat/` | Interfaz de Q&A con streaming y citas |
+| `Library/` | Biblioteca con carpetas jerárquicas, breadcrumb, búsqueda, tarjetas con estado y reintentar en error |
+| `Chat/` | Q&A con streaming, markdown completo, citas expandibles y panel de debug RAG |
 | `DocumentDetail/` | Previsualización, metadata y acciones sobre un documento |
-| `Settings/` | Idioma, proveedor IA activo, reindexado, borrado total |
-| `Onboarding/` | Pantalla inicial al primer arranque |
+| `Settings/` | Idioma, proveedor IA activo, reindexado con overlay, borrado total, toggle debug RAG |
+| `Onboarding/` | Pantalla inicial y overlay de reindexado al detectar cambio de modelo |
 | `Import/` | `ImagePicker` para cámara/galería |
 
 ### `DocumentBrainShareExtension/`
@@ -154,15 +159,20 @@ Cada feature sigue el patrón `View` + `ViewModel`:
 ### Flujo principal
 
 ```text
-Importar  →  TextExtractionService  →  ChunkingService  →  EmbeddingService
-                                                                    ↓
-                                                          ChunkRepository (SQLite)
-                                                                    ↓
-Pregunta  →  BERTTokenizer  →  similitud coseno (VectorMath)  →  chunks relevantes
-                                                                    ↓
-                                          QAService  →  1. Gemini Flash (streaming)
-                                                     →  2. Apple Intelligence (fallback)
-                                                     →  3. Respuesta extractiva
+Importar  →  TextExtractionService  →  ChunkingService (párrafos, ~200 tokens)
+                  ↓ reintentos (×3)          ↓
+           recuperación en arranque   EmbeddingService (multi-qa-MiniLM, 384 dim)
+                                                    ↓
+                                          ChunkRepository (SQLite + FTS5)
+                                                    ↓
+Pregunta  →  expandedQuery  →  BERTTokenizer  →  hybridSearch (coseno + FTS5)
+                                                    ↓
+                                       expandContextWithNeighbors
+                                                    ↓
+                                   QAService + historial (últimas 3 rondas)
+                                       →  1. Gemini Flash (multi-turn + streaming)
+                                       →  2. Apple Intelligence (fallback)
+                                       →  3. Respuesta extractiva
 ```
 
 ### Componentes clave
@@ -241,12 +251,13 @@ xcodebuild test -project DocumentBrain.xcodeproj -scheme DocumentBrain -destinat
 
 ## Estado del proyecto
 
-El proyecto ya cubre el flujo completo:
+El proyecto cubre el flujo completo:
 
-ingesta -> indexado -> organización en carpetas -> consulta en chat.
+ingesta → indexado semántico → organización en carpetas → consulta conversacional en chat.
 
 Áreas naturales de mejora:
 
-- optimizar escalado de búsqueda vectorial en colecciones grandes,
-- ampliar tests de pipeline (extractores y ranking),
-- endurecer warnings de concurrencia para Swift 6 estricto.
+- afinar pesos del hybrid search (vectorial vs. FTS5) para mejorar recall en colecciones grandes,
+- ampliar tests de pipeline (extractores, chunking y ranking),
+- endurecer warnings de concurrencia para Swift 6 estricto,
+- onboarding interactivo en el primer arranque.
