@@ -1,21 +1,23 @@
 import SwiftUI
 
 struct MainTabView: View {
+    private var lang: AppLanguage { AppLanguage.current }
+
     var body: some View {
         TabView {
             LibraryView()
                 .tabItem {
-                    Label("Biblioteca", systemImage: "square.grid.2x2.fill")
+                    Label(lang.tabLibrary, systemImage: "square.grid.2x2.fill")
                 }
 
             ChatView()
                 .tabItem {
-                    Label("Preguntar", systemImage: "bubble.left.and.bubble.right.fill")
+                    Label(lang.tabChat, systemImage: "bubble.left.and.bubble.right.fill")
                 }
 
             SettingsView()
                 .tabItem {
-                    Label("Ajustes", systemImage: "gearshape.fill")
+                    Label(lang.tabSettings, systemImage: "gearshape.fill")
                 }
         }
         .tint(Color.appAccent)

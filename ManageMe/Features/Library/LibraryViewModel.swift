@@ -3,6 +3,31 @@ import Foundation
 import SwiftUI
 import UniformTypeIdentifiers
 
+enum LibrarySortOption: String, CaseIterable {
+    case newest, oldest, nameAZ, nameZA, largest
+
+    var label: String {
+        let lang = AppLanguage.current
+        switch self {
+        case .newest: return lang.sortNewest
+        case .oldest: return lang.sortOldest
+        case .nameAZ: return lang.sortNameAZ
+        case .nameZA: return lang.sortNameZA
+        case .largest: return lang.sortLargest
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .newest: return "arrow.down.circle"
+        case .oldest: return "arrow.up.circle"
+        case .nameAZ: return "textformat.abc"
+        case .nameZA: return "textformat.abc"
+        case .largest: return "arrow.up.right.square"
+        }
+    }
+}
+
 @MainActor
 final class LibraryViewModel: ObservableObject {
     @Published var documents: [Document] = []
@@ -10,6 +35,7 @@ final class LibraryViewModel: ObservableObject {
     @Published var showImporter = false
     @Published var showCamera = false
     @Published var filterType: FileType?
+    @Published var sortOption: LibrarySortOption = .newest
     @Published var userErrorMessage: String?
 
     // Folder navigation
@@ -27,8 +53,35 @@ final class LibraryViewModel: ObservableObject {
     ]
 
     var filteredDocuments: [Document] {
-        guard let filterType else { return documents }
-        return documents.filter { $0.fileType == filterType.rawValue }
+        var docs = documents
+        if let filterType {
+            docs = docs.filter { $0.fileType == filterType.rawValue }
+        }
+        return sortDocuments(docs)
+    }
+
+    private func sortDocuments(_ docs: [Document]) -> [Document] {
+        switch sortOption {
+        case .newest: return docs.sorted { $0.createdAt > $1.createdAt }
+        case .oldest: return docs.sorted { $0.createdAt < $1.createdAt }
+        case .nameAZ: return docs.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        case .nameZA: return docs.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedDescending }
+        case .largest: return docs.sorted { ($0.fileSizeBytes ?? 0) > ($1.fileSizeBytes ?? 0) }
+        }
+    }
+
+    var hasProcessingDocuments: Bool {
+        documents.contains { doc in
+            let status = doc.processingStatusEnum
+            return status == .pending || status == .extracting || status == .chunking || status == .embedding
+        }
+    }
+
+    var processingCount: Int {
+        documents.filter { doc in
+            let status = doc.processingStatusEnum
+            return status == .pending || status == .extracting || status == .chunking || status == .embedding
+        }.count
     }
 
     var isInFolder: Bool {
@@ -36,7 +89,7 @@ final class LibraryViewModel: ObservableObject {
     }
 
     var currentFolderName: String {
-        folderPath.last?.name ?? "Biblioteca"
+        folderPath.last?.name ?? AppLanguage.current.libraryTitle
     }
 
     func loadDocuments() async {
@@ -59,7 +112,7 @@ final class LibraryViewModel: ObservableObject {
             documentCounts = counts
         } catch {
             AppLogger.error("Error cargando documentos: \(error.localizedDescription)")
-            userErrorMessage = "No se pudieron cargar los documentos."
+            userErrorMessage = AppLanguage.current.errorLoadDocuments
         }
     }
 
@@ -97,7 +150,7 @@ final class LibraryViewModel: ObservableObject {
                 await loadDocuments()
             } catch {
                 AppLogger.error("Error creando carpeta: \(error.localizedDescription)")
-                userErrorMessage = "No se pudo crear la carpeta."
+                userErrorMessage = AppLanguage.current.errorCreateFolder
             }
         }
     }
@@ -114,7 +167,7 @@ final class LibraryViewModel: ObservableObject {
                 await loadDocuments()
             } catch {
                 AppLogger.error("Error renombrando carpeta: \(error.localizedDescription)")
-                userErrorMessage = "No se pudo renombrar la carpeta."
+                userErrorMessage = AppLanguage.current.errorRenameFolder
             }
         }
     }
@@ -126,7 +179,7 @@ final class LibraryViewModel: ObservableObject {
                 await loadDocuments()
             } catch {
                 AppLogger.error("Error eliminando carpeta: \(error.localizedDescription)")
-                userErrorMessage = "No se pudo eliminar la carpeta."
+                userErrorMessage = AppLanguage.current.errorDeleteFolder
             }
         }
     }
@@ -140,7 +193,7 @@ final class LibraryViewModel: ObservableObject {
                 await loadDocuments()
             } catch {
                 AppLogger.error("Error moviendo documento: \(error.localizedDescription)")
-                userErrorMessage = "No se pudo mover el documento."
+                userErrorMessage = AppLanguage.current.errorMoveDocument
             }
         }
     }
@@ -155,7 +208,7 @@ final class LibraryViewModel: ObservableObject {
             }
         case .failure(let error):
             AppLogger.error("Error importando: \(error.localizedDescription)")
-            userErrorMessage = "No se pudo importar el archivo seleccionado."
+            userErrorMessage = AppLanguage.current.errorImportFile
         }
     }
 
@@ -176,7 +229,7 @@ final class LibraryViewModel: ObservableObject {
                 documents.removeAll { $0.id == id }
             } catch {
                 AppLogger.error("Error eliminando: \(error.localizedDescription)")
-                userErrorMessage = "No se pudo eliminar el documento."
+                userErrorMessage = AppLanguage.current.errorDeleteDocument
             }
         }
     }
@@ -210,7 +263,7 @@ final class LibraryViewModel: ObservableObject {
             }
         } catch {
             AppLogger.error("Error importando archivo: \(error.localizedDescription)")
-            userErrorMessage = "No se pudo guardar el archivo importado."
+            userErrorMessage = AppLanguage.current.errorSaveFile
         }
     }
 
@@ -271,7 +324,7 @@ final class LibraryViewModel: ObservableObject {
             title = title.replacingOccurrences(of: "  ", with: " ")
         }
 
-        return title.isEmpty ? "Documento importado" : title
+        return title.isEmpty ? AppLanguage.current.libraryImportedDocument : title
     }
 
     private func importCameraImage(_ image: UIImage) async {
@@ -287,7 +340,7 @@ final class LibraryViewModel: ObservableObject {
             try data.write(to: destinationURL)
 
             let document = Document(
-                title: "Foto \(Date().formatted(date: .abbreviated, time: .shortened))",
+                title: AppLanguage.current.libraryPhotoTitle(date: Date().formatted(date: .abbreviated, time: .shortened)),
                 fileType: .image,
                 fileURL: relativePath,
                 fileSizeBytes: Int64(data.count),
@@ -305,7 +358,7 @@ final class LibraryViewModel: ObservableObject {
             }
         } catch {
             AppLogger.error("Error guardando foto: \(error.localizedDescription)")
-            userErrorMessage = "No se pudo guardar la foto capturada."
+            userErrorMessage = AppLanguage.current.errorSavePhoto
         }
     }
 

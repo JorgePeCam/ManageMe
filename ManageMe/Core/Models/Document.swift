@@ -11,14 +11,15 @@ enum FileType: String, Codable, CaseIterable {
     case unknown
 
     var displayName: String {
+        let lang = AppLanguage.current
         switch self {
-        case .pdf: return "PDF"
-        case .image: return "Imagen"
-        case .docx: return "Word"
-        case .xlsx: return "Excel"
-        case .text: return "Texto"
-        case .email: return "Email"
-        case .unknown: return "Otro"
+        case .pdf: return lang.fileTypePDF
+        case .image: return lang.fileTypeImage
+        case .docx: return lang.fileTypeWord
+        case .xlsx: return lang.fileTypeExcel
+        case .text: return lang.fileTypeText
+        case .email: return lang.fileTypeEmail
+        case .unknown: return lang.fileTypeOther
         }
     }
 

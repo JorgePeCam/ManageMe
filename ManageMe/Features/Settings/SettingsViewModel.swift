@@ -4,7 +4,7 @@ import Foundation
 @MainActor
 final class SettingsViewModel: ObservableObject {
     @Published var documentCount = 0
-    @Published var storageUsed = "Calculando..."
+    @Published var storageUsed = "..."
     @Published var showDeleteConfirmation = false
     @Published var userErrorMessage: String?
     @Published var selectedLanguage: AppLanguage = AppLanguage.current
@@ -63,7 +63,7 @@ final class SettingsViewModel: ObservableObject {
             storageUsed = ByteCountFormatter.string(fromByteCount: totalBytes, countStyle: .file)
         } catch {
             AppLogger.error("Error cargando estadisticas: \(error.localizedDescription)")
-            userErrorMessage = "No se pudieron cargar las estadísticas."
+            userErrorMessage = lang.errorLoadStats
         }
     }
 
@@ -77,7 +77,7 @@ final class SettingsViewModel: ObservableObject {
                 await loadStats()
             } catch {
                 AppLogger.error("Error reindexando documentos: \(error.localizedDescription)")
-                userErrorMessage = "No se pudieron reindexar los documentos."
+                userErrorMessage = lang.errorReindex
             }
         }
     }
@@ -106,7 +106,7 @@ final class SettingsViewModel: ObservableObject {
                 NotificationCenter.default.post(name: .allDataDidDelete, object: nil)
             } catch {
                 AppLogger.error("Error borrando datos: \(error.localizedDescription)")
-                userErrorMessage = "No se pudieron borrar todos los datos."
+                userErrorMessage = lang.errorDeleteAll
             }
         }
     }

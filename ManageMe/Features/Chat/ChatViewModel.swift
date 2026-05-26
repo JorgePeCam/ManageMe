@@ -235,17 +235,21 @@ final class ChatViewModel: ObservableObject {
             "duration", "when", "worked"
         ]
 
-        let words = salientQueryTerms(from: query)
-            .filter { !temporalTerms.contains($0) && !$0.hasPrefix("trabaj") }
+        let meaningful = Set(ChunkRepository.meaningfulWords(from: query).map(normalizedText))
+        let words = orderedNormalizedTokens(from: query)
+            .filter { meaningful.contains($0) }
+            .filter { !temporalTerms.contains($0) && !genericIntentTerms.contains($0) && !$0.hasPrefix("trabaj") }
 
         if !words.isEmpty {
             return words
         }
 
+        // Last-resort fallback: proper nouns from the original query.
         return query
             .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { $0.count > 2 && $0.first?.isUppercase == true }
             .map(normalizedText)
-            .filter { $0.count > 2 && !temporalTerms.contains($0) && !$0.hasPrefix("trabaj") }
+            .filter { !temporalTerms.contains($0) && !genericIntentTerms.contains($0) && !$0.hasPrefix("trabaj") }
     }
 
     private func datePatternScore(_ text: String) -> Int {
@@ -407,81 +411,101 @@ final class ChatViewModel: ObservableObject {
     ) async -> [SearchResult] {
         guard !selected.isEmpty else { return [] }
 
-        var merged: [String: SearchResult] = Dictionary(uniqueKeysWithValues: selected.map { ($0.id, $0) })
-        var chunkCache: [String: [DocumentChunk]] = [:]
+        let temporal = isTemporalQuery(query)
+        let maxDocs = temporal ? 2 : 3
+        let baseNeighborRadius = temporal ? 3 : 2
+        let perDocLimit = temporal ? 10 : 6
 
-        // Determine how many documents are represented in the selection
-        let documentIds = Set(selected.map(\.documentId))
+        let groupedByDocument = Dictionary(grouping: selected, by: \.documentId)
+        let rankedDocIds = groupedByDocument
+            .map { docId, seeds -> (id: String, score: Float) in
+                let top = seeds.map(\.score).max() ?? 0
+                let sum = seeds.reduce(Float(0)) { $0 + $1.score }
+                return (docId, top * 2 + sum)
+            }
+            .sorted { $0.score > $1.score }
+            .prefix(maxDocs)
+            .map(\.id)
 
-        // For each relevant document, fetch ALL its chunks so the LLM gets
-        // the full picture (e.g., all sections of a CV when asking about work at Indra).
-        for seed in selected {
-            let chunks: [DocumentChunk]
-            if let cached = chunkCache[seed.documentId] {
-                chunks = cached
-            } else {
-                guard let fetched = try? await chunkRepo.fetchChunks(forDocumentId: seed.documentId),
-                      !fetched.isEmpty else { continue }
-                chunkCache[seed.documentId] = fetched
-                chunks = fetched
+        var merged: [String: SearchResult] = [:]
+        var documentRank: [String: Int] = [:]
+        for (index, docId) in rankedDocIds.enumerated() {
+            documentRank[docId] = index
+        }
+
+        for docId in rankedDocIds {
+            guard let seeds = groupedByDocument[docId], !seeds.isEmpty else { continue }
+
+            // Always keep the original selected chunks for this doc.
+            for seed in seeds {
+                merged[seed.id] = seed
             }
 
-            // If ≤ 2 documents are relevant or the document is small, include ALL chunks.
-            // Otherwise use a wider neighbor radius.
-            let includeAll = documentIds.count <= 2 || chunks.count <= 8
+            guard let chunks = try? await chunkRepo.fetchChunks(forDocumentId: docId),
+                  !chunks.isEmpty else {
+                continue
+            }
 
-            if includeAll {
-                for chunk in chunks {
-                    guard merged[chunk.id] == nil else { continue }
-                    // Score neighbors by proximity to the seed
-                    let distance: Int
-                    if let seedIdx = seed.chunkIndex {
-                        distance = abs(chunk.chunkIndex - seedIdx)
-                    } else {
-                        distance = chunk.chunkIndex
-                    }
-                    let score = max(seed.score - Float(distance) * 0.03, 0.20)
-                    merged[chunk.id] = SearchResult(
+            let seedIndices = seeds.compactMap(\.chunkIndex)
+            let strongestSeed = seeds.max(by: { $0.score < $1.score })
+            let fallbackScore = strongestSeed?.score ?? 0.30
+            let neighborRadius = baseNeighborRadius + min(2, max(0, seeds.count - 1))
+            let seedIds = Set(seeds.map(\.id))
+
+            var candidates: [SearchResult] = []
+            for (position, chunk) in chunks.enumerated() {
+                let distance: Int
+                if !seedIndices.isEmpty {
+                    distance = seedIndices.map { abs($0 - chunk.chunkIndex) }.min() ?? Int.max
+                    guard distance <= neighborRadius else { continue }
+                } else {
+                    let seedPosition = strongestSeed.flatMap { seed in
+                        chunks.firstIndex(where: { $0.id == seed.id })
+                    } ?? 0
+                    distance = abs(position - seedPosition)
+                    guard distance <= neighborRadius else { continue }
+                }
+
+                let score = max(fallbackScore - Float(distance) * 0.05, 0.20)
+                candidates.append(
+                    SearchResult(
                         id: chunk.id,
                         chunkContent: chunk.content,
-                        documentId: seed.documentId,
-                        documentTitle: seed.documentTitle,
+                        documentId: docId,
+                        documentTitle: strongestSeed?.documentTitle ?? seeds[0].documentTitle,
                         score: score,
                         chunkIndex: chunk.chunkIndex
                     )
-                }
-            } else {
-                // Wider radius for multi-document queries
-                let neighborRadius = isTemporalQuery(query) ? 3 : 2
-                guard let center = chunks.firstIndex(where: { $0.id == seed.id }) else { continue }
-                let lower = max(0, center - neighborRadius)
-                let upper = min(chunks.count - 1, center + neighborRadius)
+                )
+            }
 
-                for idx in lower...upper {
-                    let neighbor = chunks[idx]
-                    guard merged[neighbor.id] == nil else { continue }
-                    let distance = abs(idx - center)
-                    let score = max(seed.score - Float(distance) * 0.05, 0.30)
-                    merged[neighbor.id] = SearchResult(
-                        id: neighbor.id,
-                        chunkContent: neighbor.content,
-                        documentId: seed.documentId,
-                        documentTitle: seed.documentTitle,
-                        score: score,
-                        chunkIndex: neighbor.chunkIndex
-                    )
+            let prioritized = candidates.sorted { lhs, rhs in
+                let lhsIsSeed = seedIds.contains(lhs.id)
+                let rhsIsSeed = seedIds.contains(rhs.id)
+                if lhsIsSeed != rhsIsSeed { return lhsIsSeed && !rhsIsSeed }
+                if lhs.score != rhs.score { return lhs.score > rhs.score }
+                return (lhs.chunkIndex ?? 0) < (rhs.chunkIndex ?? 0)
+            }
+
+            for result in prioritized.prefix(perDocLimit) {
+                if let existing = merged[result.id] {
+                    if result.score > existing.score {
+                        merged[result.id] = result
+                    }
+                } else {
+                    merged[result.id] = result
                 }
             }
         }
 
-        // Sort by document then by chunk index for coherent reading order
         let sorted = merged.values.sorted { lhs, rhs in
-            if lhs.documentId != rhs.documentId {
-                // Primary document (highest scoring) comes first
-                return lhs.score > rhs.score
+            let leftRank = documentRank[lhs.documentId] ?? Int.max
+            let rightRank = documentRank[rhs.documentId] ?? Int.max
+            if leftRank != rightRank { return leftRank < rightRank }
+            if (lhs.chunkIndex ?? Int.max) != (rhs.chunkIndex ?? Int.max) {
+                return (lhs.chunkIndex ?? Int.max) < (rhs.chunkIndex ?? Int.max)
             }
-            // Within same document, order by chunk index
-            return (lhs.chunkIndex ?? 0) < (rhs.chunkIndex ?? 0)
+            return lhs.score > rhs.score
         }
 
         return Array(sorted.prefix(limit))
@@ -632,17 +656,20 @@ final class ChatViewModel: ObservableObject {
             )
             AppLogger.debug("[QA] Expanded context: \(contextForAnswer.count) chunks")
 
-            var seenCitationKeys = Set<String>()
-            let citations = contextResults.compactMap { result -> Citation? in
-                let key = "\(result.documentId)|\(result.chunkContent.prefix(100))"
-                guard seenCitationKeys.insert(key).inserted else { return nil }
-                return Citation(
-                    documentId: result.documentId,
-                    documentTitle: result.documentTitle,
-                    chunkContent: result.chunkContent,
-                    score: result.score
-                )
-            }
+            let citations = Dictionary(grouping: contextResults, by: \.documentId)
+                .compactMap { _, group -> Citation? in
+                    guard let best = group.max(by: { $0.score < $1.score }) else { return nil }
+                    return Citation(
+                        documentId: best.documentId,
+                        documentTitle: best.documentTitle,
+                        chunkContent: best.chunkContent,
+                        score: best.score
+                    )
+                }
+                .sorted { lhs, rhs in
+                    if lhs.score != rhs.score { return lhs.score > rhs.score }
+                    return lhs.documentTitle.localizedCaseInsensitiveCompare(rhs.documentTitle) == .orderedAscending
+                }
 
             let providerName = qaService.activeProvider?.name ?? "NONE"
             AppLogger.debug("[QA] Provider: \(providerName) available=\(qaService.hasAnyProvider)")

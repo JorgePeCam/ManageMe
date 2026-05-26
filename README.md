@@ -56,30 +56,122 @@ ManageMe te permite:
 
 ## Arquitectura
 
+### Estructura general
+
 ```text
-ManageMe/
-├── Features/
-│   ├── Library/         # Biblioteca, carpetas, importación
-│   ├── DocumentDetail/  # Vista de detalle de documento
-│   ├── Chat/            # Preguntas/respuestas
-│   ├── Settings/        # Estado IA y mantenimiento
-│   └── Import/          # ImagePicker
-├── Core/
-│   ├── Models/          # Document, Folder, Chunk, Conversation...
-│   ├── Database/        # AppDatabase + repositorios
-│   ├── Services/        # Extracción, chunking, embeddings, QA
-│   ├── Sync/            # CKSyncEngine + mapeo CloudKit
-│   └── Theme.swift
-└── AI/                  # Tokenizer y recursos de modelos
+ManageMe.xcodeproj/          # Proyecto Xcode y esquemas de build
+ManageMe/                    # App principal
+├── ManageMeApp.swift        # Entry point: arranca SyncCoordinator y decide Onboarding/MainTab
+├── Core/                    # Capa de negocio (sin UI)
+│   ├── Models/              # Entidades del dominio
+│   ├── Database/            # Persistencia local con GRDB/SQLite
+│   ├── Services/            # Lógica de extracción, indexado y Q&A
+│   ├── Sync/                # Sincronización iCloud (CKSyncEngine)
+│   └── Theme.swift          # Colores, tipografías y estilos globales
+├── Features/                # Pantallas SwiftUI + ViewModels
+│   ├── Library/             # Biblioteca, carpetas e importación
+│   ├── DocumentDetail/      # Vista de detalle de documento
+│   ├── Chat/                # Preguntas y respuestas
+│   ├── Settings/            # Idioma, estado IA y mantenimiento
+│   ├── Onboarding/          # Primer arranque
+│   └── Import/              # ImagePicker (cámara/galería)
+├── AI/                      # Tokenizer y matemática vectorial
+└── Assets.xcassets          # Iconos y colores
+ManageMeShareExtension/      # Extensión para compartir desde otras apps
+ManageMeTests/               # Tests unitarios
+ManageMeUITests/             # Tests de UI
 ```
 
-Componentes clave:
+### `Core/Models/` — Entidades
+
+| Fichero | Qué representa |
+|---|---|
+| `Document.swift` | Documento importado (PDF, imagen, DOCX, etc.) |
+| `DocumentChunk.swift` | Fragmento de texto con su embedding vectorial |
+| `Folder.swift` | Carpeta que agrupa documentos |
+| `Conversation.swift` | Historial de chat y mensajes |
+| `AppLanguage.swift` | Soporte ES/EN (prompts, etiquetas, idioma activo) |
+| `Extensions.swift` | Helpers comunes |
+
+### `Core/Database/` — Persistencia
+
+| Fichero | Responsabilidad |
+|---|---|
+| `AppDatabase.swift` | Setup del schema GRDB y migraciones |
+| `DocumentRepository.swift` | CRUD de documentos y gestión de ficheros en sandbox |
+| `ChunkRepository.swift` | Búsqueda híbrida (vectorial + FTS5) |
+| `FolderRepository.swift` | Operaciones de carpetas |
+| `ConversationRepository.swift` | Persistencia de chats y mensajes |
+
+### `Core/Services/` — Lógica de negocio
+
+| Fichero | Responsabilidad |
+|---|---|
+| `TextExtractionService.swift` | Extrae texto de PDF, imágenes (OCR Vision), DOCX, XLSX, ZIP |
+| `ChunkingService.swift` | Divide el texto en fragmentos solapados |
+| `EmbeddingService.swift` | Genera embeddings vectoriales de los chunks |
+| `DocumentProcessor.swift` | Orquesta el pipeline: extracción → chunking → embeddings |
+| `QAService.swift` | Cadena de fallback de proveedores de respuesta |
+| `GeminiQAProvider.swift` | Proveedor cloud Gemini Flash (con streaming) |
+| `FoundationModelQAProvider.swift` | Proveedor on-device Apple Intelligence (iOS 26+) |
+| `SharedInboxImporter.swift` | Importa ficheros de la Share Extension al abrir la app |
+| `ThumbnailService.swift` | Genera miniaturas de documentos |
+| `ZIPReader.swift` | Descomprime ZIPs para procesar su contenido |
+
+### `Core/Sync/` — iCloud
+
+| Fichero | Responsabilidad |
+|---|---|
+| `SyncCoordinator.swift` | Orquesta la sincronización bidireccional con CloudKit |
+| `SyncFileManager.swift` | Gestiona los ficheros físicos en iCloud Drive |
+| `RecordMapper.swift` | Mapea modelos locales a/desde registros CloudKit |
+
+### `AI/` — Motor semántico local
+
+| Fichero | Responsabilidad |
+|---|---|
+| `BERTTokenizer.swift` | Tokenizador BERT para preparar texto antes de embeddings |
+| `VectorMath.swift` | Similitud coseno y operaciones vectoriales |
+| `vocab.txt` / `qa_vocab.txt` | Vocabulario del modelo |
+
+### `Features/` — UI
+
+Cada feature sigue el patrón `View` + `ViewModel`:
+
+| Feature | Función |
+|---|---|
+| `Library/` | Biblioteca con tabs, carpetas, búsqueda y tarjetas de documento |
+| `Chat/` | Interfaz de Q&A con streaming y citas |
+| `DocumentDetail/` | Previsualización, metadata y acciones sobre un documento |
+| `Settings/` | Idioma, proveedor IA activo, reindexado, borrado total |
+| `Onboarding/` | Pantalla inicial al primer arranque |
+| `Import/` | `ImagePicker` para cámara/galería |
+
+### `ManageMeShareExtension/`
+
+`ShareViewController.swift` recibe ficheros y URLs compartidos desde otras apps (Safari, Mail, WhatsApp…) y los deposita en el inbox compartido vía App Group. Al activar la app, `SharedInboxImporter` los procesa.
+
+### Flujo principal
+
+```text
+Importar  →  TextExtractionService  →  ChunkingService  →  EmbeddingService
+                                                                    ↓
+                                                          ChunkRepository (SQLite)
+                                                                    ↓
+Pregunta  →  BERTTokenizer  →  similitud coseno (VectorMath)  →  chunks relevantes
+                                                                    ↓
+                                          QAService  →  1. Gemini Flash (streaming)
+                                                     →  2. Apple Intelligence (fallback)
+                                                     →  3. Respuesta extractiva
+```
+
+### Componentes clave
 
 - `DocumentProcessor`: pipeline de ingesta y procesamiento.
-- `ChunkRepository`: búsqueda vectorial + FTS híbrida.
-- `FolderRepository`: operaciones de carpetas.
-- `QAService`: cadena de proveedores de respuesta.
+- `ChunkRepository`: búsqueda híbrida vectorial + FTS5.
+- `QAService`: cadena de proveedores de respuesta con fallback automático.
 - `SyncCoordinator`: sincronización bidireccional con iCloud.
+- `SharedInboxImporter`: puente entre la Share Extension y el pipeline.
 
 ---
 
@@ -87,8 +179,11 @@ Componentes clave:
 
 `QAService` usa esta cadena de fallback:
 
-1. Apple Foundation Models (on-device), si está disponible.
-2. Respuesta extractiva local, como último recurso.
+1. **Gemini Flash** (cloud, free tier) — primaria, mejor calidad y streaming.
+2. **Apple Foundation Models** (on-device, iOS 26+) — cuando no hay red o se agota el cupo.
+3. **Respuesta extractiva local** — último recurso si fallan los anteriores.
+
+El idioma de la respuesta sigue al idioma activo de la app (`AppLanguage`).
 
 ---
 
