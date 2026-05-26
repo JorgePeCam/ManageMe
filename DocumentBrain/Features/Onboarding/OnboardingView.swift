@@ -159,7 +159,7 @@ private struct APIKeySetupPage: View {
 
     private var lang: AppLanguage { AppLanguage.current }
 
-    enum VerificationState {
+    enum VerificationState: Equatable {
         case idle, verifying, valid, invalid(String)
     }
 
@@ -339,18 +339,6 @@ private struct APIKeySetupPage: View {
             verificationState = .valid
         } else {
             verificationState = .invalid("")
-        }
-    }
-}
-
-// MARK: - Helpers
-
-extension APIKeySetupPage.VerificationState: Equatable {
-    static func == (lhs: Self, rhs: Self) -> Bool {
-        switch (lhs, rhs) {
-        case (.idle, .idle), (.verifying, .verifying), (.valid, .valid): return true
-        case (.invalid, .invalid): return true
-        default: return false
         }
     }
 }
