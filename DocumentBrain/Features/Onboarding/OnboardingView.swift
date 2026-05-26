@@ -279,6 +279,7 @@ private struct APIKeySetupPage: View {
         .scrollBounceBehavior(.basedOnSize)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.appCardSecondary)
+        .ignoresSafeArea(.keyboard)
     }
 
     @ViewBuilder
