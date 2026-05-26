@@ -184,8 +184,8 @@ final class ChatViewModel: ObservableObject {
             let results = try await chunkRepo.hybridSearch(
                 queryVector: queryVector,
                 queryText: searchQuery,
-                limit: 8,
-                minScore: 0.3
+                limit: 12,
+                minScore: 0.2
             )
 
             AppLogger.debug("[QA] Query: \"\(query)\" → \(results.count) results")

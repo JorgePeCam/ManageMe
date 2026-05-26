@@ -271,6 +271,13 @@ struct MessageBubble: View {
                         .background(LinearGradient.accentGradient)
                         .foregroundStyle(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 18))
+                } else if message.content.isEmpty {
+                    TypingIndicator()
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 14)
+                        .background(Color.appCard)
+                        .clipShape(RoundedRectangle(cornerRadius: 18))
+                        .shadow(color: .black.opacity(0.04), radius: 3, y: 1)
                 } else {
                     MarkdownRenderer(text: message.content)
                         .padding(.horizontal, 16)
