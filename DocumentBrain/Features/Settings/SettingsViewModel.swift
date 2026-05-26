@@ -68,17 +68,51 @@ final class SettingsViewModel: ObservableObject {
     }
 
     func reindexAll() {
-        Task {
-            do {
-                let docs = try await repository.fetchAll()
-                for doc in docs {
-                    await DocumentProcessor.shared.reprocess(documentId: doc.id)
-                }
-                await loadStats()
-            } catch {
-                AppLogger.error("Error reindexando documentos: \(error.localizedDescription)")
-                userErrorMessage = lang.errorReindex
+        Task { await runReindex() }
+    }
+
+    static func reindexAllDocuments() async {
+        let repo = DocumentRepository()
+        guard let docs = try? await repo.fetchAll(), !docs.isEmpty else { return }
+
+        let state = AppState.shared
+        state.reindexTotal = docs.count
+        state.reindexCompleted = 0
+        state.isReindexing = true
+
+        for doc in docs {
+            await DocumentProcessor.shared.reprocess(documentId: doc.id)
+            state.reindexCompleted += 1
+        }
+
+        state.isReindexing = false
+        state.reindexTotal = 0
+        state.reindexCompleted = 0
+    }
+
+    private func runReindex() async {
+        do {
+            let docs = try await repository.fetchAll()
+            guard !docs.isEmpty else { return }
+
+            let state = AppState.shared
+            state.reindexTotal = docs.count
+            state.reindexCompleted = 0
+            state.isReindexing = true
+
+            for doc in docs {
+                await DocumentProcessor.shared.reprocess(documentId: doc.id)
+                state.reindexCompleted += 1
             }
+
+            state.isReindexing = false
+            state.reindexTotal = 0
+            state.reindexCompleted = 0
+            await loadStats()
+        } catch {
+            AppState.shared.isReindexing = false
+            AppLogger.error("Error reindexando documentos: \(error.localizedDescription)")
+            userErrorMessage = lang.errorReindex
         }
     }
 

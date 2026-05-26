@@ -1,8 +1,14 @@
 import Foundation
 
+/// A single exchange in the conversation history passed to LLM providers.
+struct ConversationTurn {
+    let userMessage: String
+    let assistantMessage: String
+}
+
 /// Protocol for Q&A providers (on-device or cloud API)
 protocol QAProvider {
-    func answer(query: String, context: [SearchResult]) async throws -> String
+    func answer(query: String, context: [SearchResult], history: [ConversationTurn]) async throws -> String
     var isAvailable: Bool { get }
     var name: String { get }
     var kind: QAProviderKind { get }
@@ -10,7 +16,7 @@ protocol QAProvider {
 
 /// Protocol for providers that support streaming responses
 protocol StreamableQAProvider: QAProvider {
-    func streamAnswer(query: String, context: [SearchResult], onUpdate: @escaping (String) -> Void) async throws
+    func streamAnswer(query: String, context: [SearchResult], history: [ConversationTurn], onUpdate: @escaping (String) -> Void) async throws
 }
 
 enum QAProviderKind {
@@ -60,20 +66,20 @@ final class QAService {
     }
 
     /// Try each provider in order until one succeeds
-    func answer(query: String, context: [SearchResult]) async throws -> String {
+    func answer(query: String, context: [SearchResult], history: [ConversationTurn] = []) async throws -> String {
         var lastError: Error?
 
         AppLogger.debug("[QAService] Providers: \(providers.map { "\($0.name) available=\($0.isAvailable)" })")
         for provider in providers where provider.isAvailable {
             do {
                 AppLogger.debug("[QAService] Trying provider: \(provider.name)")
-                let result = try await provider.answer(query: query, context: context)
+                let result = try await provider.answer(query: query, context: context, history: history)
                 AppLogger.debug("[QAService] ✅ \(provider.name) succeeded")
                 return result
             } catch {
                 AppLogger.debug("[QAService] ⚠️ \(provider.name) failed: \(error.localizedDescription)")
                 lastError = error
-                continue // Try next provider
+                continue
             }
         }
 
@@ -81,7 +87,7 @@ final class QAService {
     }
 
     /// Stream the answer, falling back to non-streaming providers
-    func streamAnswer(query: String, context: [SearchResult], onUpdate: @escaping (String) -> Void) async throws {
+    func streamAnswer(query: String, context: [SearchResult], history: [ConversationTurn] = [], onUpdate: @escaping (String) -> Void) async throws {
         var lastError: Error?
 
         AppLogger.debug("[QAService] Stream — Providers: \(providers.map { "\($0.name) available=\($0.isAvailable)" })")
@@ -89,29 +95,28 @@ final class QAService {
             do {
                 AppLogger.debug("[QAService] Stream — Trying: \(provider.name)")
                 if let streamable = provider as? StreamableQAProvider {
-                    try await streamable.streamAnswer(query: query, context: context, onUpdate: onUpdate)
+                    try await streamable.streamAnswer(query: query, context: context, history: history, onUpdate: onUpdate)
                 } else {
-                    let result = try await provider.answer(query: query, context: context)
+                    let result = try await provider.answer(query: query, context: context, history: history)
                     onUpdate(result)
                 }
                 AppLogger.debug("[QAService] ✅ Stream — \(provider.name) succeeded")
-                return // Success
+                return
             } catch {
                 AppLogger.debug("[QAService] ⚠️ Stream — \(provider.name) failed: \(error.localizedDescription)")
                 lastError = error
-                continue // Try next provider
+                continue
             }
         }
 
         throw lastError ?? QAError.noProviderAvailable
     }
 
-    /// Backward-compatible prompt builder used by tests and providers.
-    static func buildPrompt(query: String, context: [SearchResult]) -> String {
+    /// Builds the context+question block sent as the current user turn.
+    /// System instructions are passed separately (via systemInstruction or session instructions).
+    static func buildContextPrompt(query: String, context: [SearchResult]) -> String {
         let lang = AppLanguage.current
-
-        var prompt = lang.systemPrompt
-        prompt += "\n\n\(lang.snippetsHeader)"
+        var prompt = lang.snippetsHeader
 
         for (index, result) in context.enumerated() {
             prompt += "\n\n\(lang.snippetLabel(title: result.documentTitle, index: index + 1))\n"

@@ -54,6 +54,19 @@ final class GeminiQAProvider: StreamableQAProvider {
         Array(key.utf8).map { $0 ^ obfuscationKey }
     }
 
+    // MARK: - Multi-turn builder
+
+    /// Builds the Gemini `contents` array: history turns + current user message.
+    private func buildContents(history: [ConversationTurn], currentPrompt: String) -> [[String: Any]] {
+        var contents: [[String: Any]] = []
+        for turn in history {
+            contents.append(["role": "user",  "parts": [["text": turn.userMessage]]])
+            contents.append(["role": "model", "parts": [["text": turn.assistantMessage]]])
+        }
+        contents.append(["role": "user", "parts": [["text": currentPrompt]]])
+        return contents
+    }
+
     // MARK: - Gemini API
 
     private let model = "gemini-2.5-flash"
@@ -66,7 +79,7 @@ final class GeminiQAProvider: StreamableQAProvider {
         URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):streamGenerateContent?alt=sse&key=\(apiKey)")!
     }
 
-    func answer(query: String, context: [SearchResult]) async throws -> String {
+    func answer(query: String, context: [SearchResult], history: [ConversationTurn] = []) async throws -> String {
         let keyPreview = String(apiKey.prefix(10)) + "..."
         AppLogger.debug("[Gemini] 🚀 Starting request. Key=\(keyPreview) model=\(model) isAvailable=\(isAvailable)")
 
@@ -75,19 +88,17 @@ final class GeminiQAProvider: StreamableQAProvider {
             throw QAError.noProviderAvailable
         }
 
-        // Check rate limit before making the call
         if DailyUsageTracker.isLimitReached(limit: Self.dailyLimitPerDevice) {
             AppLogger.debug("[Gemini] ❌ Daily limit reached (\(Self.dailyLimitPerDevice)). Falling back.")
             throw QAError.noProviderAvailable
         }
 
-        let prompt = QAService.buildPrompt(query: query, context: Array(context.prefix(8)))
-        AppLogger.debug("[Gemini] Prompt length: \(prompt.count) chars, context chunks: \(min(context.count, 8))")
+        let contextPrompt = QAService.buildContextPrompt(query: query, context: Array(context.prefix(8)))
+        AppLogger.debug("[Gemini] Prompt length: \(contextPrompt.count) chars, history turns: \(history.count)")
 
         let requestBody: [String: Any] = [
-            "contents": [
-                ["parts": [["text": prompt]]]
-            ],
+            "systemInstruction": ["parts": [["text": AppLanguage.current.systemPrompt]]],
+            "contents": buildContents(history: history, currentPrompt: contextPrompt),
             "generationConfig": [
                 "maxOutputTokens": 2048,
                 "temperature": 0.3
@@ -150,7 +161,7 @@ final class GeminiQAProvider: StreamableQAProvider {
 
     // MARK: - Streaming
 
-    func streamAnswer(query: String, context: [SearchResult], onUpdate: @escaping (String) -> Void) async throws {
+    func streamAnswer(query: String, context: [SearchResult], history: [ConversationTurn] = [], onUpdate: @escaping (String) -> Void) async throws {
         let keyPreview = String(apiKey.prefix(10)) + "..."
         AppLogger.debug("[Gemini] 🚀 Starting STREAM request. Key=\(keyPreview) model=\(model)")
 
@@ -163,12 +174,11 @@ final class GeminiQAProvider: StreamableQAProvider {
             throw QAError.noProviderAvailable
         }
 
-        let prompt = QAService.buildPrompt(query: query, context: Array(context.prefix(8)))
+        let contextPrompt = QAService.buildContextPrompt(query: query, context: Array(context.prefix(8)))
 
         let requestBody: [String: Any] = [
-            "contents": [
-                ["parts": [["text": prompt]]]
-            ],
+            "systemInstruction": ["parts": [["text": AppLanguage.current.systemPrompt]]],
+            "contents": buildContents(history: history, currentPrompt: contextPrompt),
             "generationConfig": [
                 "maxOutputTokens": 2048,
                 "temperature": 0.3
