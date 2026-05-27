@@ -8,23 +8,7 @@ final class SettingsViewModel: ObservableObject {
     @Published var showDeleteConfirmation = false
     @Published var userErrorMessage: String?
     @Published var selectedLanguage: AppLanguage = AppLanguage.current
-    @Published var showAPIKeySheet = false
-    @Published var pendingAPIKey = ""
-    @Published var apiKeyVerificationState: APIKeyVerificationState = .idle
-
     private let repository = DocumentRepository()
-
-    init() {
-        APIKeyStore.migrateLegacyUserDefaultsKeyIfNeeded()
-    }
-
-    enum APIKeyVerificationState: Equatable {
-        case idle, verifying, valid, invalid
-    }
-
-    var isGeminiKeyConfigured: Bool {
-        !APIKeyStore.loadKey().isEmpty
-    }
 
     var lang: AppLanguage { selectedLanguage }
 
@@ -58,27 +42,6 @@ final class SettingsViewModel: ObservableObject {
         case .cloud:    return lang.aiFooterCloud
         case nil:       return lang.aiFooterBasic
         }
-    }
-
-    func verifyAndSaveAPIKey() {
-        let trimmed = pendingAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        apiKeyVerificationState = .verifying
-        Task {
-            let isValid = await GeminiQAProvider.verifyKey(trimmed)
-            if isValid {
-                try? APIKeyStore.saveKey(trimmed)
-                apiKeyVerificationState = .valid
-                showAPIKeySheet = false
-                pendingAPIKey = ""
-            } else {
-                apiKeyVerificationState = .invalid
-            }
-        }
-    }
-
-    func removeAPIKey() {
-        try? APIKeyStore.deleteOpenAIKey()
     }
 
     func changeLanguage(to language: AppLanguage) {
