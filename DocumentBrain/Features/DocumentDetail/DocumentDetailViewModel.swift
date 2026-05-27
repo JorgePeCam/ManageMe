@@ -5,6 +5,7 @@ import Foundation
 final class DocumentDetailViewModel: ObservableObject {
     @Published var document: Document?
     @Published var previewURL: URL?
+    @Published var isExtractingMetadata = false
 
     private let repository = DocumentRepository()
     private var documentId: String?
@@ -15,6 +16,23 @@ final class DocumentDetailViewModel: ObservableObject {
             document = try await repository.fetchOne(id: documentId)
         } catch {
             AppLogger.error("Error cargando documento: \(error)")
+        }
+    }
+
+    /// Manually re-triggers metadata extraction for an already-processed document.
+    func extractMetadata() {
+        guard let document, document.isReady, !document.content.isEmpty else { return }
+        isExtractingMetadata = true
+        Task {
+            await DocumentProcessor.shared.extractMetadata(
+                documentId: document.id,
+                text: document.content,
+                title: document.title
+            )
+            if let id = documentId {
+                await load(documentId: id)
+            }
+            isExtractingMetadata = false
         }
     }
 

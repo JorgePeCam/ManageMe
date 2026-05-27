@@ -95,6 +95,9 @@ struct Document: Identifiable, Codable, FetchableRecord, PersistableRecord {
     var needsSyncPush: Bool
     var modifiedAt: Date?
 
+    // Structured metadata extracted by LLM (JSON-encoded StructuredDocumentData)
+    var structuredData: String?
+
     init(
         id: String = UUID().uuidString,
         title: String,
@@ -143,6 +146,12 @@ struct Document: Identifiable, Codable, FetchableRecord, PersistableRecord {
 
     var isReady: Bool {
         processingStatusEnum == .ready
+    }
+
+    var structuredDataDecoded: StructuredDocumentData? {
+        guard let json = structuredData,
+              let data = json.data(using: .utf8) else { return nil }
+        return try? JSONDecoder().decode(StructuredDocumentData.self, from: data)
     }
 
     var absoluteFileURL: URL? {

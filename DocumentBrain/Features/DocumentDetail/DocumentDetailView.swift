@@ -21,6 +21,12 @@ struct DocumentDetailView: View {
 
                     statusCard(document)
 
+                    if let metadata = document.structuredDataDecoded {
+                        structuredDataCard(metadata, document: document)
+                    } else if document.isReady && !document.content.isEmpty {
+                        extractMetadataButton
+                    }
+
                     if document.absoluteFileURL != nil {
                         previewButton
                     }
@@ -218,6 +224,106 @@ struct DocumentDetailView: View {
             )
         }
         .buttonStyle(.plain)
+    }
+
+    // MARK: - Structured Data Card
+
+    private func structuredDataCard(_ metadata: StructuredDocumentData, document: Document) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Header
+            HStack(spacing: 10) {
+                Image(systemName: metadata.documentType?.systemImage ?? "sparkles")
+                    .font(.title3)
+                    .foregroundStyle(Color.appAccent)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(metadata.documentType?.displayName ?? "Datos extraídos")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                    if let category = metadata.category {
+                        Text("\(category.emoji) \(category.displayName)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Spacer()
+
+                Button {
+                    viewModel.extractMetadata()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .disabled(viewModel.isExtractingMetadata)
+            }
+
+            Divider()
+
+            // Data rows
+            if let vendor = metadata.vendor {
+                metadataRow(icon: "building.2", label: "Emisor", value: vendor)
+            }
+            if let date = metadata.formattedDate {
+                metadataRow(icon: "calendar", label: "Fecha", value: date)
+            }
+            if let amount = metadata.formattedAmount {
+                metadataRow(icon: "eurosign.circle", label: "Importe", value: amount, highlight: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardStyle()
+    }
+
+    private func metadataRow(icon: String, label: String, value: String, highlight: Bool = false) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.caption)
+                .foregroundStyle(Color.appAccent)
+                .frame(width: 18)
+
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(width: 50, alignment: .leading)
+
+            Text(value)
+                .font(highlight ? .subheadline.bold() : .subheadline)
+                .foregroundStyle(highlight ? Color.appAccent : .primary)
+
+            Spacer()
+        }
+    }
+
+    private var extractMetadataButton: some View {
+        Button {
+            viewModel.extractMetadata()
+        } label: {
+            HStack(spacing: 8) {
+                if viewModel.isExtractingMetadata {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                        .tint(Color.appAccent)
+                    Text("Analizando documento…")
+                } else {
+                    Image(systemName: "sparkles")
+                        .foregroundStyle(Color.appAccent)
+                    Text("Extraer datos estructurados")
+                        .fontWeight(.medium)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(Color.appCard)
+            .clipShape(RoundedRectangle(cornerRadius: AppStyle.cornerRadius))
+            .overlay(
+                RoundedRectangle(cornerRadius: AppStyle.cornerRadius)
+                    .stroke(Color.appAccent.opacity(0.2), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(viewModel.isExtractingMetadata)
     }
 
     // MARK: - Extracted Text

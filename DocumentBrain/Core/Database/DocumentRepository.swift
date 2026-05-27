@@ -110,6 +110,19 @@ struct DocumentRepository {
         }
     }
 
+    // MARK: - Structured metadata
+
+    func saveStructuredData(_ data: StructuredDocumentData, forDocumentId id: String) async throws {
+        let json = try JSONEncoder().encode(data)
+        guard let jsonString = String(data: json, encoding: .utf8) else { return }
+        try await db.dbWriter.write { db in
+            try db.execute(
+                sql: "UPDATE document SET structuredData = ? WHERE id = ?",
+                arguments: [jsonString, id]
+            )
+        }
+    }
+
     // MARK: - Thumbnail
 
     func updateThumbnail(documentId: String, thumbnailURL: String) async throws {

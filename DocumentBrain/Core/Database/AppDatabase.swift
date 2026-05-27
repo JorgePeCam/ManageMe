@@ -220,6 +220,12 @@ final class AppDatabase {
             }
         }
 
+        migrator.registerMigration("addStructuredData") { db in
+            try db.alter(table: "document") { t in
+                t.add(column: "structuredData", .text)
+            }
+        }
+
         return migrator
     }
 

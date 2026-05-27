@@ -7,6 +7,7 @@ actor DocumentProcessor {
     private let chunkingService = ChunkingService()
     private let documentRepo = DocumentRepository()
     private let chunkRepo = ChunkRepository()
+    private let metadataExtractor = MetadataExtractionService()
 
     private let maxAttempts = 3
 
@@ -104,10 +105,30 @@ actor DocumentProcessor {
         // 4. Save
         try await chunkRepo.saveChunks(chunksWithEmbeddings)
         try await documentRepo.updateStatus(id: documentId, status: .ready)
+
+        // 5. Extract structured metadata (optional — never fails the pipeline)
+        Task {
+            await extractMetadata(documentId: documentId, text: extractedText, title: document.title)
+        }
     }
 
     private func setError(documentId: String, message: String) async {
         try? await documentRepo.updateStatus(id: documentId, status: .error, error: message)
+    }
+
+    // MARK: - Metadata extraction (also callable from UI for manual re-extraction)
+
+    func extractMetadata(documentId: String, text: String, title: String) async {
+        guard let metadata = await metadataExtractor.extract(from: text, documentTitle: title) else {
+            AppLogger.debug("[Processor] No structured metadata for \(documentId)")
+            return
+        }
+        do {
+            try await documentRepo.saveStructuredData(metadata, forDocumentId: documentId)
+            AppLogger.debug("[Processor] Metadata saved for \(documentId): \(metadata.vendor ?? "-"), \(metadata.formattedAmount ?? "-")")
+        } catch {
+            AppLogger.error("[Processor] Error saving metadata: \(error.localizedDescription)")
+        }
     }
 }
 
