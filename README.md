@@ -1,305 +1,305 @@
 # DocumentBrain
 
-DocumentBrain es una app iOS para **organizar documentos y hacer preguntas sobre su contenido** mediante búsqueda semántica local y un asistente de IA conversacional.
+DocumentBrain is an iOS app for **organizing documents and asking questions about their content** using on-device semantic search and a conversational AI assistant.
 
-Importas archivos, la app extrae el texto, lo trocea en fragmentos semánticos, genera embeddings vectoriales y luego responde tus preguntas en chat con citas al documento fuente. Todo el procesamiento pesado ocurre en el dispositivo.
-
----
-
-## Qué resuelve
-
-Cuando tienes información repartida en PDFs, fotos de documentos, hojas de cálculo y ficheros de texto, recuperar una respuesta concreta requiere abrir varios archivos y buscar manualmente.
-
-DocumentBrain te permite:
-
-- centralizar todos tus archivos en una biblioteca organizada,
-- agruparlos en carpetas jerárquicas,
-- consultar el contenido en lenguaje natural desde el chat,
-- ver exactamente de qué fragmento del documento viene cada respuesta.
+You import files, the app extracts text, splits it into semantic chunks, generates vector embeddings, and then answers your questions in a chat interface with citations back to the source document. All the heavy processing runs on-device.
 
 ---
 
-## Funcionalidades
+## Problem
 
-### Biblioteca y organización
+When your information is scattered across PDFs, document photos, spreadsheets and text files, retrieving a specific answer means opening multiple files and searching manually.
 
-- Importación desde el sistema de archivos, cámara/galería y Share Extension.
-- **Carpetas jerárquicas** con navegación por breadcrumb, creación, renombrado, borrado y movimiento de documentos a cualquier nivel.
-- Tarjetas de documento con miniatura, estado de procesamiento y acción de reintento en caso de error.
-- Filtros y ordenación por nombre, fecha y tipo.
+DocumentBrain lets you:
 
-### Procesamiento de documentos
-
-- **Pipeline automático**: extracción de texto → chunking semántico → embeddings → persistencia.
-- **Reintentos con backoff** (hasta 3 intentos, 2s y 4s de espera) para errores transitorios.
-- **Recuperación al arrancar**: detecta documentos que quedaron en estados intermedios (crash durante el procesamiento) y los reprocesa automáticamente.
-- **Reindexado completo** con overlay de progreso; se lanza automáticamente cuando se detecta un cambio de versión del modelo de embeddings.
-
-### Búsqueda semántica
-
-- **Hybrid search**: similitud coseno vectorial + FTS5 por palabras clave, combinados con deduplicación por ID de chunk.
-- Umbral mínimo de score configurable (0.15 para vectorial, 0.25 en vectorial estricto).
-- Expansión de contexto: los chunks recuperados se enriquecen con sus fragmentos vecinos en el documento para dar más contexto al LLM.
-- Expansión de query corta para preguntas de seguimiento conversacional ("¿y el autor?").
-
-### Chat conversacional
-
-- Contexto multi-turn: las últimas 3 rondas de conversación se pasan al LLM para respuestas coherentes.
-- **Streaming** de respuesta token a token.
-- **Markdown completo**: headers, listas, código, separadores horizontales.
-- **Citas tapeables**: cada respuesta muestra píldoras con la fuente; al tapear se abre el fragmento exacto recuperado.
-- Selección de texto en mensajes del asistente (long-press para copiar).
-- Fallback automático: Gemini Flash → Apple Intelligence (on-device, iOS 26+) → respuesta extractiva local.
-- Desambiguación automática cuando los chunks recuperados corresponden a múltiples documentos distintos.
-
-### Ajustes y mantenimiento
-
-- Cambio de idioma (ES / EN) en tiempo real.
-- Estado del proveedor de IA activo.
-- Estado de sincronización iCloud.
-- Reindexado con barra de progreso.
-- Borrado completo de datos (documentos, conversaciones, caché de miniaturas).
-- **Panel de debug RAG** (toggle Developer): muestra los chunks recuperados, sus scores, la query expandida y el proveedor usado, bajo cada respuesta.
+- centralize all your files in an organized library,
+- group them in hierarchical folders,
+- query the content in natural language from a chat interface,
+- see exactly which fragment of which document each answer came from.
 
 ---
 
-## Tipos de archivo soportados
+## Features
 
-| Formato | Extracción |
+### Library & organization
+
+- Import from the file system, camera/gallery, and Share Extension.
+- **Hierarchical folders** with breadcrumb navigation, create, rename, delete, and move documents to any depth level.
+- Document cards with thumbnail, processing status, and a retry action on error.
+- Filters and sorting by name, date, and type.
+
+### Document processing
+
+- **Automatic pipeline**: text extraction → semantic chunking → embeddings → persistence.
+- **Retry with exponential backoff** (up to 3 attempts, 2s and 4s delays) for transient errors.
+- **Crash recovery on startup**: detects documents stuck in intermediate states and reprocesses them automatically.
+- **Full reindex** with progress overlay; triggered automatically when an embedding model version change is detected.
+
+### Semantic search
+
+- **Hybrid search**: vector cosine similarity + FTS5 keyword search, merged with chunk-ID deduplication.
+- Configurable minimum score thresholds (0.15 for vector, 0.25 in strict vector mode).
+- Context expansion: retrieved chunks are enriched with their neighboring fragments to provide more context to the LLM.
+- Short query expansion for conversational follow-ups ("and the author?").
+
+### Conversational chat
+
+- Multi-turn context: the last 3 conversation rounds are passed to the LLM for coherent responses.
+- **Token-by-token streaming**.
+- **Full markdown**: headers, lists, code blocks, horizontal rules.
+- **Tappable citations**: each answer shows source pills; tapping opens the exact retrieved fragment.
+- Text selection on assistant messages (long-press to copy).
+- Automatic fallback: Gemini Flash → Apple Intelligence (on-device, iOS 26+) → local extractive answer.
+- Automatic disambiguation when retrieved chunks span multiple distinct documents.
+
+### Settings & maintenance
+
+- Language switch (ES / EN) in real time.
+- Active AI provider status.
+- iCloud sync status.
+- Reindex with progress bar.
+- Full data wipe (documents, conversations, thumbnail cache).
+- **RAG debug panel** (Developer toggle): shows retrieved chunks with scores, expanded query and active provider below each answer.
+
+---
+
+## Supported file types
+
+| Format | Extraction |
 |---|---|
-| `PDF` | Texto nativo (PDFKit) + OCR automático cuando hace falta |
-| Imágenes (`jpg`, `png`, `heic`, `webp`…) | OCR con Vision framework |
-| `DOCX` | Parsing del XML interno |
-| `XLSX` | Lectura de hojas y shared strings |
-| `TXT`, `MD`, `CSV`, `RTF` | Lectura directa |
-| `ZIP` | Descompresión y procesamiento de contenidos |
+| `PDF` | Native text (PDFKit) + automatic OCR when needed |
+| Images (`jpg`, `png`, `heic`, `webp`…) | OCR via Vision framework |
+| `DOCX` | Internal XML parsing |
+| `XLSX` | Sheet and shared-strings parsing |
+| `TXT`, `MD`, `CSV`, `RTF` | Direct read |
+| `ZIP` | Decompression and recursive content processing |
 
 ---
 
-## Arquitectura
+## Architecture
 
-### Estructura de carpetas
+### Folder structure
 
 ```text
 DocumentBrain.xcodeproj/
-DocumentBrain/                        # App principal
-├── DocumentBrainApp.swift            # Entry point: arranque, onboarding, SyncCoordinator
+DocumentBrain/                        # Main app target
+├── DocumentBrainApp.swift            # Entry point: startup, onboarding, SyncCoordinator
 ├── Core/
-│   ├── Models/                       # Entidades del dominio
-│   ├── Database/                     # Capa de persistencia (GRDB/SQLite)
-│   ├── Services/                     # Lógica de negocio
-│   ├── Sync/                         # Sincronización iCloud (CKSyncEngine)
-│   └── Theme.swift                   # Colores, estilos y constantes de UI
-├── Features/                         # Pantallas SwiftUI + ViewModels (MVVM)
+│   ├── Models/                       # Domain entities
+│   ├── Database/                     # Persistence layer (GRDB/SQLite)
+│   ├── Services/                     # Business logic
+│   ├── Sync/                         # iCloud sync (CKSyncEngine)
+│   └── Theme.swift                   # Colors, styles and UI constants
+├── Features/                         # SwiftUI screens + ViewModels (MVVM)
 │   ├── Library/
 │   ├── DocumentDetail/
 │   ├── Chat/
 │   ├── Settings/
 │   ├── Onboarding/
 │   └── Import/
-├── AI/                               # Tokenizador y matemática vectorial
+├── AI/                               # Tokenizer and vector math
 ├── PrivacyInfo.xcprivacy             # Privacy Manifest (App Store)
 └── Assets.xcassets/
-DocumentBrainShareExtension/          # Share Extension
-DocumentBrainTests/                   # Tests unitarios
-cloudflare-worker/                    # Proxy edge (Cloudflare Workers)
+DocumentBrainShareExtension/          # Share Extension target
+DocumentBrainTests/                   # Unit tests
+cloudflare-worker/                    # Edge proxy (Cloudflare Workers)
 ```
 
-### Patrones de diseño
+### Design patterns
 
-- **MVVM**: cada feature tiene su `View` (SwiftUI puro, sin lógica) y su `ViewModel` (`@MainActor`, `ObservableObject`).
-- **Singleton controlado**: `EmbeddingService.shared` y `QAService.shared` evitan recargar modelos CoreML por operación.
-- **Inyección de dependencias**: `EmbeddingServiceProtocol` permite mockear embeddings en tests sin cargar el modelo.
-- **Repositorio**: cada entidad tiene su repositorio que encapsula las queries GRDB. Nunca se hace SQL libre fuera de los repositorios.
+- **MVVM**: each feature has a `View` (pure SwiftUI, no business logic) and a `ViewModel` (`@MainActor`, `ObservableObject`).
+- **Controlled singletons**: `EmbeddingService.shared` and `QAService.shared` avoid reloading CoreML models on every operation.
+- **Dependency injection**: `EmbeddingServiceProtocol` allows mocking embeddings in tests without loading the model.
+- **Repository pattern**: each entity has its own repository encapsulating all GRDB queries. Raw SQL interpolation is never done outside repositories.
 
 ---
 
-## Pipeline RAG
+## RAG Pipeline
 
 ```
-INGESTA
+INGESTION
 ─────────────────────────────────────────────────────────────────────
-Archivo  →  TextExtractionService  →  texto plano
-                  ↓ hasta 3 reintentos (backoff 2s / 4s)
-            ChunkingService  →  fragmentos semánticos (~800 chars / ~200 tokens)
-                  ↓
-            EmbeddingService  →  vector 384-dim (multi-qa-MiniLM-L6-cos-v1, CoreML)
-                  ↓
-            ChunkRepository  →  SQLite + índice FTS5
+File  →  TextExtractionService  →  plain text
+               ↓ up to 3 retries (backoff 2s / 4s)
+         ChunkingService  →  semantic fragments (~800 chars / ~200 tokens)
+               ↓
+         EmbeddingService  →  384-dim vector (multi-qa-MiniLM-L6-cos-v1, CoreML)
+               ↓
+         ChunkRepository  →  SQLite + FTS5 index
 
-CONSULTA
+QUERY
 ─────────────────────────────────────────────────────────────────────
-Pregunta del usuario
+User question
     ↓
-expandedQuery (añade contexto de turns anteriores si la pregunta es corta)
+expandedQuery (adds context from prior turns if question is short)
     ↓
-BERTTokenizer  →  vector de query (384-dim)
+BERTTokenizer  →  384-dim query vector
     ↓
 hybridSearch:
-    ├─ vectorSearch   (coseno ≥ 0.15, top-5)
-    └─ FTS5 search    (AND estricto, relax a OR si < 2 resultados)
-    ↓ deduplicación + merge por score
-expandContextWithNeighbors  →  chunks ± 1 vecino para dar más contexto al LLM
+    ├─ vectorSearch   (cosine ≥ 0.15, top-5)
+    └─ FTS5 search    (strict AND, relaxed to OR if < 2 results)
+    ↓ deduplication + score merge
+expandContextWithNeighbors  →  ± 1 neighboring chunk for richer LLM context
     ↓
-QAService  →  buildContextPrompt  →  últimas 3 rondas de historial
+QAService  →  buildContextPrompt  →  last 3 history turns
     ↓
     1. GeminiQAProvider   (cloud, streaming, multi-turn)
     2. FoundationModelQAProvider  (on-device, Apple Intelligence, iOS 26+)
-    3. Respuesta extractiva  (fragmento local, sin LLM)
+    3. Extractive answer  (local fragment, no LLM)
     ↓
-Respuesta con markdown + citas tapeables
+Answer with full markdown + tappable citations
 ```
 
-### Chunking semántico
+### Semantic chunking
 
-`ChunkingService` divide el texto respetando la estructura semántica del documento:
+`ChunkingService` splits text while respecting the document's semantic structure:
 
-1. **Normalización**: elimina espacios redundantes y colapsa líneas en blanco excesivas.
-2. **División por párrafos** como unidad primaria de corte.
-3. **Fusión de párrafos huérfanos**: párrafos de menos de 60 chars se fusionan con el siguiente.
-4. **Ensamblado de chunks**: se acumulan párrafos hasta ~800 chars (~200 tokens). Los párrafos largos que no caben se dividen por límites de oración con guard de abreviaciones.
-5. **Overlap semántico**: el último párrafo completo del chunk anterior se prepende al siguiente para evitar pérdida de contexto en los bordes.
+1. **Normalization**: removes redundant whitespace and collapses excessive blank lines.
+2. **Paragraph-first splitting**: paragraphs are the primary split unit.
+3. **Orphan paragraph merging**: paragraphs shorter than 60 chars are merged into the next one.
+4. **Chunk assembly**: paragraphs are accumulated up to ~800 chars (~200 tokens). Paragraphs that exceed the limit are split at sentence boundaries with abbreviation guards.
+5. **Semantic overlap**: the last complete paragraph of the previous chunk is prepended to the next one to avoid context loss at boundaries.
 
-Este enfoque mejora la precisión de recuperación frente a chunking por tamaño fijo porque cada fragmento tiende a contener una idea coherente.
+This approach outperforms fixed-size chunking because each fragment tends to contain a coherent idea, improving embedding quality and retrieval precision.
 
-### Modelo de embeddings
+### Embedding model
 
-`multi-qa-MiniLM-L6-cos-v1` (384 dimensiones, cuantizado a CoreML):
+`multi-qa-MiniLM-L6-cos-v1` (384 dimensions, quantized to CoreML):
 
-- Entrenado específicamente para Q&A retrieval (pares pregunta-respuesta), a diferencia de modelos de propósito general.
-- 6 capas transformer, eficiente en dispositivos con Neural Engine.
-- Similitud coseno normalizada: todos los vectores se almacenan con norma unitaria para que el producto punto sea equivalente al coseno y la búsqueda sea más rápida.
-- Al detectar un cambio de versión del modelo, la app lanza un reindexado automático completo con overlay de progreso.
+- Fine-tuned specifically for Q&A retrieval on question-answer pairs, unlike general-purpose sentence transformers.
+- 6-layer transformer, efficient on Apple Neural Engine.
+- Cosine-normalized: all vectors are stored with unit norm so dot product equals cosine similarity, making search faster.
+- When a model version change is detected at startup, the app triggers a full automatic reindex with progress overlay.
 
 ---
 
-## Seguridad
+## Security
 
-La seguridad es una prioridad de diseño, no un añadido posterior. A continuación se detalla cada capa.
+Security is a first-class design concern, not an afterthought. Here is a detailed breakdown of each layer.
 
-### Arquitectura de proxy (clave API nunca en el dispositivo)
+### Proxy architecture (API key never on device)
 
-Las peticiones a Gemini no salen directamente del dispositivo. La app se comunica exclusivamente con un **Cloudflare Worker** desplegado en el edge que actúa como proxy seguro:
+Gemini requests never leave the device directly. The app communicates exclusively with a **Cloudflare Worker** deployed at the edge acting as a secure proxy:
 
 ```
-App iOS  ──(HTTPS + x-app-secret)──▶  Cloudflare Worker  ──(x-goog-api-key)──▶  Gemini API
+iOS App  ──(HTTPS + x-app-secret)──▶  Cloudflare Worker  ──(x-goog-api-key)──▶  Gemini API
 ```
 
-- La clave de Gemini (`GEMINI_API_KEY`) vive como **secreto de entorno** en Cloudflare Workers y nunca toca el dispositivo del usuario.
-- La app se autentica con el Worker mediante un **secreto compartido** (`x-app-secret`) en la cabecera HTTP, también almacenado en `Config.plist` (fichero excluido del control de versiones).
-- Cualquier petición sin el header correcto recibe un `401 Unauthorized`.
+- The Gemini key (`GEMINI_API_KEY`) lives as an **environment secret** in Cloudflare Workers and never touches the user's device.
+- The app authenticates with the Worker using a **shared secret** (`x-app-secret`) HTTP header, stored locally in `Config.plist` (excluded from version control).
+- Any request without the correct header receives `401 Unauthorized`.
 
-**Por qué esto importa:** si la app fuera comprometida por ingeniería inversa, el atacante no obtendría ninguna clave de API, solo el secreto de app — que en el peor caso solo da acceso al proxy (sin coste directo para el atacante, con tus créditos).
+**Why this matters:** if the app binary were reverse-engineered, an attacker would obtain no API key — only the app secret, which at worst grants access to the proxy (no direct cost to the attacker, billed to your Gemini account).
 
-### Cloudflare Worker — detalles técnicos
+### Cloudflare Worker — technical details
 
-El Worker (`cloudflare-worker/src/index.js`) implementa:
+The Worker (`cloudflare-worker/src/index.js`) implements:
 
-| Mecanismo | Implementación |
+| Mechanism | Implementation |
 |---|---|
-| Autenticación de la app | Header `x-app-secret` validado contra variable de entorno `APP_SECRET` |
-| Rate limiting por IP | KV de Cloudflare: 20 peticiones/IP/día; devuelve `429` al superarlo |
-| Inyección de la clave | Header `x-goog-api-key` añadido server-side, nunca expuesto al cliente |
-| Streaming SSE | Pass-through directo del body de Gemini con cabeceras CORS |
-| CORS | Restringido a los métodos y headers que usa la app (`POST`, `x-app-secret`) |
+| App authentication | `x-app-secret` header validated against the `APP_SECRET` environment variable |
+| Per-IP rate limiting | Cloudflare KV: 20 requests/IP/day; returns `429` when exceeded |
+| Key injection | `x-goog-api-key` header added server-side, never exposed to the client |
+| SSE streaming | Direct pass-through of Gemini's response body with CORS headers |
+| CORS | Restricted to the methods and headers used by the app (`POST`, `x-app-secret`) |
 
-### Persistencia local
+### Local persistence
 
-- **GRDB/SQLite con queries parametrizadas**: toda la capa de base de datos usa binding de parámetros (la API de GRDB no permite SQL libre con interpolación de strings). Inyección SQL estructuralmente imposible.
-- **FTS5**: el módulo `sanitizeFTSQuery` filtra y escapa los términos del usuario antes de construir la query FTS para evitar manipulación del índice.
-- **Sin datos sensibles en UserDefaults**: ninguna clave, token ni credencial se almacena en UserDefaults ni en iCloud KV.
-- Los archivos del usuario se guardan en el sandbox de la app (`Documents/files`) con los permisos estándar de iOS.
+- **GRDB/SQLite with parameterized queries**: the entire database layer uses GRDB's binding API. The library does not allow free-form SQL string interpolation, making SQL injection structurally impossible.
+- **FTS5**: `sanitizeFTSQuery` filters and escapes user terms before building the FTS query, preventing index manipulation.
+- **No sensitive data in UserDefaults**: no key, token or credential is ever stored in UserDefaults or iCloud key-value storage.
+- User files are stored in the app sandbox (`Documents/files`) under standard iOS permissions.
 
-### Config.plist y secretos
+### Config.plist and secrets
 
-`Config.plist` (que contiene `WorkerURL` y `AppSecret`) está en `.gitignore` y **nunca se sube al repositorio**. Cada instalación del proyecto requiere crear este fichero manualmente (o via CI secrets).
+`Config.plist` (containing `WorkerURL` and `AppSecret`) is in `.gitignore` and **never committed to the repository**. Each project installation requires creating this file manually (or via CI secrets injection).
 
 ### Privacy Manifest (App Store)
 
-`PrivacyInfo.xcprivacy` declara explícitamente:
+`PrivacyInfo.xcprivacy` explicitly declares:
 
-- `NSPrivacyTracking: false` — la app no hace tracking de ningún tipo.
-- `NSPrivacyTrackingDomains: []` — sin dominios de tracking.
-- `NSPrivacyCollectedDataTypes: []` — no se recopilan datos del usuario.
+- `NSPrivacyTracking: false` — the app performs no tracking of any kind.
+- `NSPrivacyTrackingDomains: []` — no tracking domains.
+- `NSPrivacyCollectedDataTypes: []` — no user data is collected.
 - `NSPrivacyAccessedAPITypes`:
-  - **UserDefaults** (razón CA92.1): almacena preferencias del usuario (idioma, onboarding completado).
-  - **FileTimestamp** (razón C617.1): accede a fechas de modificación de ficheros del sandbox.
+  - **UserDefaults** (reason CA92.1): stores user preferences (language, onboarding state).
+  - **FileTimestamp** (reason C617.1): accesses modification dates of sandbox files.
 
-### Accesibilidad
+### Accessibility
 
-Todos los controles interactivos tienen etiquetas VoiceOver y cumplen el mínimo de 44×44 pt de área táctil recomendado por Apple HIG. Los iconos decorativos están marcados como `accessibilityHidden(true)`.
+All interactive controls have VoiceOver labels and meet Apple HIG's minimum 44×44 pt touch target. Decorative icons are marked `accessibilityHidden(true)`.
 
 ---
 
-## IA y privacidad
+## AI & privacy
 
-`QAService` implementa una cadena de fallback:
+`QAService` implements a provider fallback chain:
 
-| Prioridad | Proveedor | Requisitos | Características |
+| Priority | Provider | Requirements | Characteristics |
 |---|---|---|---|
-| 1 | **Gemini Flash** (cloud) | Conexión a internet | Mejor calidad, streaming, multi-turn |
-| 2 | **Apple Foundation Models** (on-device) | iOS 26+, Apple Intelligence activo | Sin red, privacidad total, sin coste |
-| 3 | **Respuesta extractiva** (local) | Ninguno | Devuelve el fragmento más relevante sin LLM |
+| 1 | **Gemini Flash** (cloud) | Internet connection | Best quality, streaming, multi-turn |
+| 2 | **Apple Foundation Models** (on-device) | iOS 26+, Apple Intelligence enabled | Offline, full privacy, no cost |
+| 3 | **Extractive answer** (local) | None | Returns the most relevant fragment without an LLM |
 
-- El idioma de las respuestas sigue al idioma activo de la app (`AppLanguage`): el system prompt se genera en el idioma seleccionado.
-- El historial conversacional (últimas 3 rondas) se pasa al LLM para respuestas coherentes en conversaciones multi-pregunta.
-- Cuando los resultados recuperados corresponden a múltiples documentos, el prompt instruye al LLM a desambiguar en lugar de mezclar respuestas.
+- The response language follows the active app language (`AppLanguage`): the system prompt is generated in the selected language.
+- Conversational history (last 3 turns) is passed to the LLM for coherent multi-question conversations.
+- When retrieved results span multiple documents, the prompt instructs the LLM to disambiguate rather than blend answers.
 
 ---
 
-## Sincronización iCloud
+## iCloud Sync
 
-DocumentBrain incluye sincronización bidireccional con CloudKit (base de datos privada del usuario):
+DocumentBrain includes bidirectional sync with CloudKit (user's private database):
 
-- Sincroniza documentos, carpetas, conversaciones y mensajes.
-- Mantiene una cola local de cambios pendientes con reintento cuando la app vuelve a estar activa.
-- `SyncCoordinator` (iOS 17+) orquesta la sincronización; en iOS 16 la app funciona sin sync.
-- El estado de sincronización es visible en Ajustes (indicador activo / sincronizando / error).
+- Syncs documents, folders, conversations, and messages.
+- Maintains a local pending-changes queue with retry when the app becomes active.
+- `SyncCoordinator` (iOS 17+) orchestrates sync; on iOS 16 the app works fully offline.
+- Sync status is visible in Settings (active / syncing / error indicator).
 
-**Requisitos**: iOS 17+, sesión de iCloud activa, mismo Apple ID en los dispositivos.
+**Requirements**: iOS 17+, active iCloud session, same Apple ID across devices.
 
 ---
 
 ## Share Extension
 
-La extensión `DocumentBrainShareExtension` permite guardar contenido directamente desde otras apps:
+`DocumentBrainShareExtension` lets users save content from any app without opening DocumentBrain:
 
-1. Desde Safari, Mail, WhatsApp u otra app: Compartir → **Guardar en DocumentBrain**.
-2. La extensión copia los archivos compartidos al inbox del App Group (`group.com.documentbrain.shared`).
-3. Al activar DocumentBrain, `SharedInboxImporter` detecta el inbox y lanza el pipeline normal (extracción → chunking → embeddings).
+1. From Safari, Mail, WhatsApp or any other app: Share → **Save to DocumentBrain**.
+2. The extension copies shared files to the App Group inbox (`group.com.documentbrain.shared`).
+3. When DocumentBrain activates, `SharedInboxImporter` detects the inbox and launches the normal pipeline (extraction → chunking → embeddings).
 
-Soporta archivos adjuntos, URLs y texto plano compartido.
+Supports file attachments, URLs, and shared plain text.
 
 ---
 
-## Stack tecnológico
+## Tech stack
 
-| Categoría | Tecnología |
+| Category | Technology |
 |---|---|
 | UI | SwiftUI, NavigationStack, TabView |
-| Persistencia | GRDB 6 (SQLite), FTS5 |
-| Búsqueda semántica | CoreML, `multi-qa-MiniLM-L6-cos-v1` (384-dim) |
-| Tokenización | BERT WordPiece (vocab propio) |
-| LLM cloud | Gemini Flash 2.5 vía Cloudflare Worker proxy |
-| LLM on-device | Apple Foundation Models (iOS 26+) |
-| Extracción de texto | PDFKit, Vision (OCR), ZIPFoundation |
-| Sincronización | CloudKit / CKSyncEngine (iOS 17+) |
-| Proxy edge | Cloudflare Workers (JavaScript) |
-| Mínimo iOS | iOS 16 |
+| Persistence | GRDB 6 (SQLite), FTS5 |
+| Semantic search | CoreML, `multi-qa-MiniLM-L6-cos-v1` (384-dim) |
+| Tokenization | BERT WordPiece (custom vocab) |
+| Cloud LLM | Gemini Flash 2.5 via Cloudflare Worker proxy |
+| On-device LLM | Apple Foundation Models (iOS 26+) |
+| Text extraction | PDFKit, Vision (OCR), ZIPFoundation |
+| Sync | CloudKit / CKSyncEngine (iOS 17+) |
+| Edge proxy | Cloudflare Workers (JavaScript) |
+| Minimum iOS | iOS 16 |
 
 ---
 
-## Desarrollo local
+## Local development
 
-### Requisitos
+### Requirements
 
-- macOS con Xcode 16+.
-- Simulador iOS o dispositivo físico.
-- `Config.plist` con las claves de entorno (ver abajo).
+- macOS with Xcode 16+.
+- iOS Simulator or physical device.
+- `Config.plist` with environment keys (see below).
 
 ### Config.plist
 
-Crea `DocumentBrain/Config.plist` (no incluido en el repo):
+Create `DocumentBrain/Config.plist` (not included in the repo):
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -307,35 +307,35 @@ Crea `DocumentBrain/Config.plist` (no incluido en el repo):
 <plist version="1.0">
 <dict>
     <key>WorkerURL</key>
-    <string>https://tu-worker.workers.dev</string>
+    <string>https://your-worker.workers.dev</string>
     <key>AppSecret</key>
-    <string>tu-secreto-compartido</string>
+    <string>your-shared-secret</string>
 </dict>
 </plist>
 ```
 
-### Cloudflare Worker (opcional para desarrollo local)
+### Cloudflare Worker (optional for local development)
 
 ```bash
 cd cloudflare-worker
 npm install -g wrangler
 wrangler login
 
-# Configurar secretos de producción
+# Set production secrets
 wrangler secret put GEMINI_API_KEY
 wrangler secret put APP_SECRET
 
-# Desplegar
+# Deploy
 wrangler deploy
 ```
 
-### Comandos de build y test
+### Build & test
 
 ```bash
-# Listar esquemas disponibles
+# List available schemes
 xcodebuild -list -project DocumentBrain.xcodeproj
 
-# Ejecutar tests unitarios
+# Run unit tests
 xcodebuild test \
   -project DocumentBrain.xcodeproj \
   -scheme DocumentBrain \
@@ -346,25 +346,25 @@ xcodebuild test \
 
 ## Tests
 
-`DocumentBrainTests/` cubre:
+`DocumentBrainTests/` covers:
 
-- `VectorMathTests`: similitud coseno, norma y operaciones vectoriales.
-- `AppDatabaseTests`: migraciones de schema, CRUD de entidades con base de datos en memoria.
-- `SearchViewModelTests`: búsqueda con EmbeddingService mockeado (sin cargar CoreML).
+- `VectorMathTests`: cosine similarity, vector norm, and arithmetic operations.
+- `AppDatabaseTests`: schema migrations, entity CRUD with an in-memory database.
+- `SearchViewModelTests`: search with a mocked `EmbeddingService` (no CoreML model loaded).
 
-La inyección de `EmbeddingServiceProtocol` hace que los tests de ViewModel sean deterministas y rápidos.
+Protocol-based injection of `EmbeddingServiceProtocol` makes ViewModel tests deterministic and fast.
 
 ---
 
-## Estado del proyecto
+## Status
 
-El flujo completo está implementado y funcional:
+The full end-to-end flow is implemented and working:
 
-**ingesta → indexado semántico → organización en carpetas → consulta conversacional con citas**
+**ingestion → semantic indexing → folder organization → conversational chat with citations**
 
-Áreas de mejora identificadas:
+Identified areas for improvement:
 
-- Ajustar pesos del hybrid search (vectorial vs. FTS5) con una colección de test para optimizar recall/precision en colecciones grandes.
-- Ampliar cobertura de tests al pipeline completo (extractores por tipo de archivo, chunking edge cases, ranking).
-- Resolver warnings de concurrencia de Swift 6 estricto (`Sendable`, actor isolation).
-- Explorar re-ranking de resultados (cross-encoder liviano) para mejorar la selección final de chunks antes de pasarlos al LLM.
+- Tune hybrid search weights (vector vs. FTS5) with a test collection to optimize recall/precision on large document sets.
+- Expand test coverage to the full pipeline (per-format extractors, chunking edge cases, ranking).
+- Resolve Swift 6 strict concurrency warnings (`Sendable`, actor isolation).
+- Explore lightweight cross-encoder re-ranking of retrieved chunks before passing them to the LLM.
