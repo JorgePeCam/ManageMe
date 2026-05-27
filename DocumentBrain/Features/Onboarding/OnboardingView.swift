@@ -79,6 +79,7 @@ struct OnboardingView: View {
                 Image(systemName: page.icon)
                     .font(.system(size: 52, weight: .light))
                     .foregroundStyle(page.accentColor)
+                    .accessibilityHidden(true)
             }
 
             VStack(spacing: 12) {
@@ -184,6 +185,7 @@ private struct APIKeySetupPage: View {
                     Image(systemName: "key.horizontal.fill")
                         .font(.system(size: 48, weight: .light))
                         .foregroundStyle(Color.orange)
+                        .accessibilityHidden(true)
                 }
 
                 // Title + subtitle

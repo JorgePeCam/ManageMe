@@ -34,6 +34,7 @@ struct ChatView: View {
                         Image(systemName: "clock.arrow.trianglehead.counterclockwise.rotate.90")
                             .foregroundStyle(Color.appAccent)
                     }
+                    .accessibilityLabel(lang.chatHistory)
                 }
 
                 ToolbarItem(placement: .primaryAction) {
@@ -43,6 +44,7 @@ struct ChatView: View {
                         Image(systemName: "plus.bubble")
                             .foregroundStyle(Color.appAccent)
                     }
+                    .accessibilityLabel(AppLanguage.current == .spanish ? "Nueva conversación" : "New conversation")
                 }
             }
             .sheet(isPresented: $showHistory) {
@@ -63,6 +65,7 @@ struct ChatView: View {
                 Image(systemName: "sparkles")
                     .font(.system(size: 32, weight: .light))
                     .foregroundStyle(Color.appAccent)
+                    .accessibilityHidden(true)
             }
             .padding(.top, 32)
 
@@ -237,7 +240,7 @@ struct ChatView: View {
                 Image(systemName: "arrow.up")
                     .font(.body.weight(.semibold))
                     .foregroundStyle(.white)
-                    .frame(width: 36, height: 36)
+                    .frame(width: 44, height: 44)
                     .background(
                         viewModel.queryText.isEmpty
                         ? AnyShapeStyle(Color.gray.opacity(0.3))
@@ -246,6 +249,7 @@ struct ChatView: View {
                     .clipShape(Circle())
             }
             .disabled(viewModel.queryText.isEmpty || viewModel.isSearching)
+            .accessibilityLabel(AppLanguage.current == .spanish ? "Enviar" : "Send")
         }
         .padding(.horizontal, AppStyle.padding)
         .padding(.vertical, 10)

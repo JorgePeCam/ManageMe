@@ -24,6 +24,7 @@ struct DocumentCard: View {
                     Image(systemName: document.fileTypeEnum.systemImage)
                         .font(.system(size: 28, weight: .light))
                         .foregroundStyle(Color.appAccent.opacity(0.7))
+                        .accessibilityHidden(true)
                 }
             }
             .frame(height: 110)
@@ -78,24 +79,29 @@ struct DocumentCard: View {
 
     @ViewBuilder
     private var statusIndicator: some View {
+        let lang = AppLanguage.current
         switch document.processingStatusEnum {
         case .ready:
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(Color.appSuccess)
                 .font(.caption)
+                .accessibilityLabel(lang.detailStatusReady)
         case .error:
             HStack(spacing: 3) {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(Color.appDanger)
                     .font(.caption)
+                    .accessibilityHidden(true)
                 Text("Error")
                     .font(.caption2)
                     .foregroundStyle(Color.appDanger)
             }
+            .accessibilityLabel(lang.detailStatusError)
         case .pending, .extracting, .chunking, .embedding:
             ProgressView()
                 .scaleEffect(0.7)
                 .tint(Color.appAccent)
+                .accessibilityLabel(lang.processingDocuments)
         }
     }
 }

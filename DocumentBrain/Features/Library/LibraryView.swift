@@ -78,6 +78,7 @@ struct LibraryView: View {
                             .symbolRenderingMode(.hierarchical)
                             .foregroundStyle(Color.appAccent)
                     }
+                    .accessibilityLabel(lang.libraryNewFolder)
                 }
             }
             .fileImporter(
@@ -163,6 +164,7 @@ struct LibraryView: View {
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(Color.appAccent)
         }
+        .accessibilityLabel(lang.libraryAll)
     }
 
     // MARK: - Sort Menu
@@ -186,6 +188,7 @@ struct LibraryView: View {
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(Color.appAccent)
         }
+        .accessibilityLabel(lang.librarySortTitle)
     }
 
     // MARK: - Processing Banner
