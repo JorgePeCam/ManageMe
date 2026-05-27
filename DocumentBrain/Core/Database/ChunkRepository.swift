@@ -4,7 +4,7 @@ import GRDB
 struct ChunkRepository {
     private let db: AppDatabase
 
-    init(db: AppDatabase = .shared) {
+    nonisolated init(db: AppDatabase = .shared) {
         self.db = db
     }
 
@@ -29,7 +29,7 @@ struct ChunkRepository {
     }
 
     func deleteChunks(forDocumentId documentId: String) async throws {
-        try await db.dbWriter.write { db in
+        _ = try await db.dbWriter.write { db in
             try DocumentChunk
                 .filter(Column("documentId") == documentId)
                 .deleteAll(db)

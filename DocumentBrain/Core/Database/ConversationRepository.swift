@@ -24,7 +24,7 @@ struct ConversationRepository {
         var c = conversation
         c.needsSyncPush = true
         c.modifiedAt = Date()
-        try await dbWriter.write { db in
+        try await dbWriter.write { [c] db in
             try c.save(db)
         }
     }
@@ -73,7 +73,7 @@ struct ConversationRepository {
         var m = message
         m.needsSyncPush = true
         m.modifiedAt = Date()
-        try await dbWriter.write { db in
+        try await dbWriter.write { [m] db in
             try m.save(db)
         }
     }

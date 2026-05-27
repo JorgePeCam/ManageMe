@@ -1,53 +1,19 @@
 import Foundation
-import OSLog
-import SwiftUI
 
 // MARK: - Vector helpers
 
 extension Array where Element == Float {
-    func toData() -> Data {
+    nonisolated func toData() -> Data {
         withUnsafeBytes { Data($0) }
     }
 }
 
 extension Data {
-    func toFloatArray() -> [Float] {
+    nonisolated func toFloatArray() -> [Float] {
         withUnsafeBytes { buffer in
             Array(buffer.bindMemory(to: Float.self))
         }
     }
-}
-
-// MARK: - Logging
-
-enum AppLogger {
-    private static let logger = Logger(subsystem: "com.documentbrain.app", category: "DocumentBrain")
-
-    static func info(_ message: String) {
-        logger.info("\(message, privacy: .public)")
-    }
-
-    static func error(_ message: String) {
-        logger.error("\(message, privacy: .public)")
-    }
-
-    /// Debug-only logging — completely stripped from release builds.
-    static func debug(_ message: String) {
-        #if DEBUG
-        let msg = message
-        logger.debug("\(msg, privacy: .public)")
-        #endif
-    }
-}
-
-// MARK: - UserDefaults keys
-
-enum UserDefaultsKeys {
-    static let hasCompletedOnboarding = "hasCompletedOnboarding"
-    static let appLanguage            = "app_language"
-    static let ragDebugMode           = "rag_debug_mode"
-    static let embeddingModelVersion  = "embeddingModelVersion"
-    static let startupStorageError    = "startup_storage_error"
 }
 
 // MARK: - Document title cleaning
@@ -55,7 +21,7 @@ enum UserDefaultsKeys {
 extension String {
     /// Cleans a raw filename into a human-readable document title.
     /// Removes hex hashes, UUIDs, Base64 tokens, underscores, and hyphens.
-    static func cleanedDocumentTitle(_ raw: String) -> String {
+    nonisolated static func cleanedDocumentTitle(_ raw: String) -> String {
         var title = raw
 
         // Remove leading UUID prefixes
@@ -97,19 +63,6 @@ extension String {
     }
 }
 
-// MARK: - Binding helpers
-
-extension Binding where Value == Bool {
-    /// Creates a `Bool` binding that is `true` while `optional` is non-nil,
-    /// and sets it to `nil` when the binding is set to `false`.
-    static func isPresent<T>(_ optional: Binding<T?>) -> Binding<Bool> {
-        Binding(
-            get: { optional.wrappedValue != nil },
-            set: { if !$0 { optional.wrappedValue = nil } }
-        )
-    }
-}
-
 // MARK: - Cached DateFormatters
 
 private let _timeFormatter: DateFormatter = {
@@ -129,8 +82,6 @@ extension Date {
     var relativeFormatted: String {
         if Calendar.current.isDateInToday(self) {
             return _timeFormatter.string(from: self)
-        } else if Calendar.current.isDate(self, equalTo: Date(), toGranularity: .year) {
-            return _shortDateFormatter.string(from: self)
         } else {
             return _shortDateFormatter.string(from: self)
         }

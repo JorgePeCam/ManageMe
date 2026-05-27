@@ -12,7 +12,7 @@ struct FolderRepository {
         var f = folder
         f.needsSyncPush = true
         f.modifiedAt = Date()
-        try await db.dbWriter.write { db in
+        try await db.dbWriter.write { [f] db in
             try f.save(db)
         }
     }
@@ -21,7 +21,7 @@ struct FolderRepository {
         var f = folder
         f.needsSyncPush = true
         f.modifiedAt = Date()
-        try await db.dbWriter.write { db in
+        try await db.dbWriter.write { [f] db in
             try f.update(db)
         }
     }

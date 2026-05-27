@@ -7,6 +7,7 @@ actor ThumbnailService {
     private let fileManager = FileManager.default
     private var cache: [String: UIImage] = [:]
     private let thumbnailSize: CGFloat = 300
+    private let repository = DocumentRepository()
 
     /// Returns a thumbnail for the document, generating and caching it if needed
     func thumbnail(for document: Document) async -> UIImage? {
@@ -109,7 +110,6 @@ actor ThumbnailService {
 
         // Update document record with thumbnail path
         let relativePath = "Thumbnails/\(document.id).jpg"
-        let repository = DocumentRepository()
         try? await repository.updateThumbnail(documentId: document.id, thumbnailURL: relativePath)
     }
 }

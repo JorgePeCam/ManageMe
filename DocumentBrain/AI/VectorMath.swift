@@ -2,7 +2,7 @@ import Foundation
 import Accelerate
 
 struct VectorMath {
-    static func cosineSimilarity(_ queryVector: [Float], _ dbVector: [Float]) -> Float {
+    nonisolated static func cosineSimilarity(_ queryVector: [Float], _ dbVector: [Float]) -> Float {
         // Validación básica
         guard queryVector.count == dbVector.count else { return 0.0 }
         

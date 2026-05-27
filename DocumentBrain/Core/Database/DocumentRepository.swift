@@ -4,7 +4,7 @@ import GRDB
 struct DocumentRepository {
     private let db: AppDatabase
 
-    init(db: AppDatabase = .shared) {
+    nonisolated init(db: AppDatabase = .shared) {
         self.db = db
     }
 
@@ -14,7 +14,7 @@ struct DocumentRepository {
         var doc = document
         doc.needsSyncPush = true
         doc.modifiedAt = Date()
-        try await db.dbWriter.write { db in
+        try await db.dbWriter.write { [doc] db in
             try doc.save(db)
         }
     }
@@ -23,7 +23,7 @@ struct DocumentRepository {
         var doc = document
         doc.needsSyncPush = true
         doc.modifiedAt = Date()
-        try await db.dbWriter.write { db in
+        try await db.dbWriter.write { [doc] db in
             try doc.update(db)
         }
     }

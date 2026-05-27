@@ -323,13 +323,13 @@ extension SyncCoordinator: CKSyncEngineDelegate {
                 guard var doc = RecordMapper.document(from: record) else { return }
 
                 // Handle file asset download
-                if let asset = record["file"] as? CKAsset {
+                if record["file"] is CKAsset {
                     let fileType = FileType(rawValue: doc.fileType) ?? .unknown
                     let relativePath = await SyncFileManager.shared.importAsset(from: record, fileType: fileType)
                     doc.fileURL = relativePath
 
                     // Update file size
-                    if let relativePath, let url = doc.absoluteFileURL {
+                    if relativePath != nil, let url = doc.absoluteFileURL {
                         let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
                         doc.fileSizeBytes = attrs?[.size] as? Int64
                     }

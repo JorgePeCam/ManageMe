@@ -1,9 +1,12 @@
 import Foundation
-import PDFKit
-import Vision
+@preconcurrency import PDFKit
+@preconcurrency import Vision
+@preconcurrency import UIKit
 import UniformTypeIdentifiers
 
 struct TextExtractionService {
+
+    nonisolated init() {}
 
     /// Extracts text from a file based on its type
     func extractText(from url: URL, fileType: FileType) async throws -> String {

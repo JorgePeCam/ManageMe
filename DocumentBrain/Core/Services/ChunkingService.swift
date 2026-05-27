@@ -8,7 +8,9 @@ struct ChunkingService {
     // Paragraphs shorter than this are merged with the next one
     private let minParagraphChars = 60
 
-    func chunk(text: String, documentId: String) -> [DocumentChunk] {
+    nonisolated init() {}
+
+    nonisolated func chunk(text: String, documentId: String) -> [DocumentChunk] {
         let cleaned = preprocess(text)
         guard !cleaned.isEmpty else { return [] }
 
@@ -19,7 +21,7 @@ struct ChunkingService {
 
     // MARK: - Pre-processing
 
-    private func preprocess(_ text: String) -> String {
+    nonisolated private func preprocess(_ text: String) -> String {
         // Collapse 3+ consecutive newlines into 2, normalise whitespace within lines
         var result = text
             .components(separatedBy: "\n")
@@ -33,7 +35,7 @@ struct ChunkingService {
 
     // MARK: - Paragraph splitting
 
-    private func splitIntoParagraphs(_ text: String) -> [String] {
+    nonisolated private func splitIntoParagraphs(_ text: String) -> [String] {
         // Primary split: blank lines
         let blocks = text.components(separatedBy: "\n\n")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -43,7 +45,7 @@ struct ChunkingService {
         return blocks.flatMap { splitLongBlock($0) }
     }
 
-    private func splitLongBlock(_ block: String) -> [String] {
+    nonisolated private func splitLongBlock(_ block: String) -> [String] {
         guard block.count > targetChunkChars * 2 else { return [block] }
 
         let sentences = splitIntoSentences(block)
@@ -65,7 +67,7 @@ struct ChunkingService {
 
     // MARK: - Merge tiny paragraphs
 
-    private func mergeTinyParagraphs(_ paragraphs: [String]) -> [String] {
+    nonisolated private func mergeTinyParagraphs(_ paragraphs: [String]) -> [String] {
         var result: [String] = []
         var pending = ""
 
@@ -85,7 +87,7 @@ struct ChunkingService {
 
     // MARK: - Chunk assembly
 
-    private func buildChunks(from paragraphs: [String], documentId: String) -> [DocumentChunk] {
+    nonisolated private func buildChunks(from paragraphs: [String], documentId: String) -> [DocumentChunk] {
         var chunks: [DocumentChunk] = []
         var currentParagraphs: [String] = []
         var currentLength = 0
@@ -127,7 +129,7 @@ struct ChunkingService {
 
     // MARK: - Sentence splitting
 
-    private func splitIntoSentences(_ text: String) -> [String] {
+    nonisolated private func splitIntoSentences(_ text: String) -> [String] {
         var sentences: [String] = []
         var current = ""
 

@@ -7,7 +7,7 @@ final class EmbeddingService {
     static let modelVersion = "multi-qa-MiniLM-L6-cos-v1"
     static let embeddingDimension = 384
 
-    static let shared: EmbeddingService? = {
+    nonisolated(unsafe) static let shared: EmbeddingService? = {
         do {
             return try EmbeddingService()
         } catch {

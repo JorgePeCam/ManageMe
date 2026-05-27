@@ -63,7 +63,7 @@ struct DocumentBrainApp: App {
         }
 
         // Pre-warm CoreML model in background so first search is instant
-        Task.detached(priority: .background) {
+        Task(priority: .background) {
             _ = EmbeddingService.shared
         }
     }

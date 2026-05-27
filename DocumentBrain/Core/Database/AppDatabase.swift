@@ -2,7 +2,7 @@ import Foundation
 import GRDB
 
 final class AppDatabase {
-    static let shared = makeShared()
+    nonisolated(unsafe) static let shared = makeShared()
 
     let dbWriter: any DatabaseWriter
 
