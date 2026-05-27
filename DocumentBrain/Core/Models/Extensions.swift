@@ -93,7 +93,7 @@ extension String {
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: " {2,}", with: " ", options: .regularExpression)
 
-        return title.isEmpty ? AppLanguage.current.libraryImportedDocument : title
+        return title.isEmpty ? "Documento importado" : title
     }
 }
 

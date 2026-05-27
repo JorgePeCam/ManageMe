@@ -88,28 +88,28 @@ final class SyncCoordinator: NSObject, ObservableObject {
             // Documents
             let docs = try await documentRepo.fetchPendingSyncPush()
             for doc in docs {
-                let id = RecordMapper.recordID(for: doc.id, recordType: RecordMapper.RecordType.document)
+                let id = RecordMapper.recordID(for: doc.id)
                 engine.state.add(pendingRecordZoneChanges: [.saveRecord(id)])
             }
 
             // Folders
             let folders = try await folderRepo.fetchPendingSyncPush()
             for folder in folders {
-                let id = RecordMapper.recordID(for: folder.id, recordType: RecordMapper.RecordType.folder)
+                let id = RecordMapper.recordID(for: folder.id)
                 engine.state.add(pendingRecordZoneChanges: [.saveRecord(id)])
             }
 
             // Conversations
             let convs = try await conversationRepo.fetchPendingSyncPushConversations()
             for conv in convs {
-                let id = RecordMapper.recordID(for: conv.id, recordType: RecordMapper.RecordType.conversation)
+                let id = RecordMapper.recordID(for: conv.id)
                 engine.state.add(pendingRecordZoneChanges: [.saveRecord(id)])
             }
 
             // Chat messages
             let msgs = try await conversationRepo.fetchPendingSyncPushMessages()
             for msg in msgs {
-                let id = RecordMapper.recordID(for: msg.id, recordType: RecordMapper.RecordType.chatMessage)
+                let id = RecordMapper.recordID(for: msg.id)
                 engine.state.add(pendingRecordZoneChanges: [.saveRecord(id)])
             }
 
