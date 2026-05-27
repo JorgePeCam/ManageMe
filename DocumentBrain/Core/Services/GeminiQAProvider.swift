@@ -35,7 +35,7 @@ final class GeminiQAProvider: StreamableQAProvider {
 
         // Use gemini-1.5-flash for verification — stable free-tier model that
         // handles minimal prompts without thinking-token requirements.
-        guard let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=\(trimmed)") else { return false }
+        guard let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent") else { return false }
 
         let body: [String: Any] = [
             "contents": [["parts": [["text": "Hi"]]]],
@@ -45,6 +45,7 @@ final class GeminiQAProvider: StreamableQAProvider {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.addValue(trimmed, forHTTPHeaderField: "x-goog-api-key")
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
         request.timeoutInterval = 15
 
@@ -75,11 +76,21 @@ final class GeminiQAProvider: StreamableQAProvider {
     private let model = "gemini-2.5-flash"
 
     private var endpoint: URL {
-        URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent?key=\(apiKey)")!
+        URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent")!
     }
 
     private var streamEndpoint: URL {
-        URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):streamGenerateContent?alt=sse&key=\(apiKey)")!
+        URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):streamGenerateContent?alt=sse")!
+    }
+
+    /// Builds a URLRequest with the API key in the header instead of the URL.
+    /// This prevents the key from appearing in proxy logs, Charles, or URL history.
+    private func makeRequest(url: URL) -> URLRequest {
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.addValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
+        return request
     }
 
     func answer(query: String, context: [SearchResult], history: [ConversationTurn] = []) async throws -> String {
@@ -108,9 +119,7 @@ final class GeminiQAProvider: StreamableQAProvider {
             ]
         ]
 
-        var request = URLRequest(url: endpoint)
-        request.httpMethod = "POST"
-        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        var request = makeRequest(url: endpoint)
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
         request.timeoutInterval = 30
 
@@ -188,9 +197,7 @@ final class GeminiQAProvider: StreamableQAProvider {
             ]
         ]
 
-        var request = URLRequest(url: streamEndpoint)
-        request.httpMethod = "POST"
-        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        var request = makeRequest(url: streamEndpoint)
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
         request.timeoutInterval = 60
 
