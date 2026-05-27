@@ -63,13 +63,29 @@ final class SettingsViewModel: ObservableObject {
     }
 
     func reindexAll() {
-        Task { await runReindex() }
+        Task {
+            do {
+                let docs = try await repository.fetchAll()
+                guard !docs.isEmpty else { return }
+                await Self.reindexDocuments(docs)
+                await loadStats()
+            } catch {
+                AppState.shared.isReindexing = false
+                AppLogger.error("Error reindexando documentos: \(error.localizedDescription)")
+                userErrorMessage = lang.errorReindex
+            }
+        }
     }
 
+    /// Reprocesses all documents with a progress overlay. Called from startup (model change)
+    /// and from the Settings reindex action.
     static func reindexAllDocuments() async {
         let repo = DocumentRepository()
         guard let docs = try? await repo.fetchAll(), !docs.isEmpty else { return }
+        await reindexDocuments(docs)
+    }
 
+    private static func reindexDocuments(_ docs: [Document]) async {
         let state = AppState.shared
         state.reindexTotal = docs.count
         state.reindexCompleted = 0
@@ -83,32 +99,6 @@ final class SettingsViewModel: ObservableObject {
         state.isReindexing = false
         state.reindexTotal = 0
         state.reindexCompleted = 0
-    }
-
-    private func runReindex() async {
-        do {
-            let docs = try await repository.fetchAll()
-            guard !docs.isEmpty else { return }
-
-            let state = AppState.shared
-            state.reindexTotal = docs.count
-            state.reindexCompleted = 0
-            state.isReindexing = true
-
-            for doc in docs {
-                await DocumentProcessor.shared.reprocess(documentId: doc.id)
-                state.reindexCompleted += 1
-            }
-
-            state.isReindexing = false
-            state.reindexTotal = 0
-            state.reindexCompleted = 0
-            await loadStats()
-        } catch {
-            AppState.shared.isReindexing = false
-            AppLogger.error("Error reindexando documentos: \(error.localizedDescription)")
-            userErrorMessage = lang.errorReindex
-        }
     }
 
     func deleteAllData() {

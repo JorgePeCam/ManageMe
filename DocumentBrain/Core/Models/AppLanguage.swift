@@ -25,19 +25,17 @@ enum AppLanguage: String, CaseIterable, Identifiable {
 
     // MARK: - Persistence
 
-    private static let key = "app_language"
-
     /// Current app language. Defaults to Spanish.
     static var current: AppLanguage {
         get {
-            guard let raw = UserDefaults.standard.string(forKey: key),
+            guard let raw = UserDefaults.standard.string(forKey: UserDefaultsKeys.appLanguage),
                   let lang = AppLanguage(rawValue: raw) else {
                 return .spanish
             }
             return lang
         }
         set {
-            UserDefaults.standard.set(newValue.rawValue, forKey: key)
+            UserDefaults.standard.set(newValue.rawValue, forKey: UserDefaultsKeys.appLanguage)
         }
     }
 
@@ -313,6 +311,29 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         switch self { case .spanish: return "Siguiente"; case .english: return "Next" }
     }
 
+    // MARK: - Accessibility labels
+
+    var accessibilityNewConversation: String {
+        switch self { case .spanish: return "Nueva conversación"; case .english: return "New conversation" }
+    }
+    var accessibilitySend: String {
+        switch self { case .spanish: return "Enviar"; case .english: return "Send" }
+    }
+    var okButton: String {
+        switch self { case .spanish: return "OK"; case .english: return "OK" }
+    }
+
+    // MARK: - Reindexing overlay
+
+    var reindexOverlayTitle: String {
+        switch self { case .spanish: return "Actualizando documentos"; case .english: return "Updating documents" }
+    }
+    var reindexOverlaySubtitle: String {
+        switch self {
+        case .spanish: return "El modelo de IA ha sido actualizado.\nReindexando tus documentos…"
+        case .english: return "The AI model has been updated.\nReindexing your documents…"
+        }
+    }
 
     // MARK: - Tabs
 

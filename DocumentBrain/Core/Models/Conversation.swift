@@ -80,39 +80,13 @@ struct PersistedChatMessage: Identifiable, Codable, FetchableRecord, Persistable
     }
 
     private static func encodeCitations(_ citations: [Citation]) -> String? {
-        let dicts = citations.map { c in
-            [
-                "documentId": c.documentId,
-                "documentTitle": c.documentTitle,
-                "chunkContent": c.chunkContent,
-                "score": String(c.score)
-            ]
-        }
-        guard let data = try? JSONSerialization.data(withJSONObject: dicts),
-              let json = String(data: data, encoding: .utf8) else {
-            return nil
-        }
-        return json
+        guard let data = try? JSONEncoder().encode(citations) else { return nil }
+        return String(data: data, encoding: .utf8)
     }
 
     private static func decodeCitations(_ json: String) -> [Citation] {
-        guard let data = json.data(using: .utf8),
-              let array = try? JSONSerialization.jsonObject(with: data) as? [[String: String]] else {
-            return []
-        }
-        return array.compactMap { dict in
-            guard let docId = dict["documentId"],
-                  let title = dict["documentTitle"],
-                  let chunk = dict["chunkContent"],
-                  let scoreStr = dict["score"],
-                  let score = Float(scoreStr) else { return nil }
-            return Citation(
-                documentId: docId,
-                documentTitle: title,
-                chunkContent: chunk,
-                score: score
-            )
-        }
+        guard let data = json.data(using: .utf8) else { return [] }
+        return (try? JSONDecoder().decode([Citation].self, from: data)) ?? []
     }
 }
 
@@ -164,7 +138,7 @@ struct RAGDebugResult: Identifiable {
 
 // MARK: - Citation
 
-struct Citation: Identifiable {
+struct Citation: Identifiable, Codable {
     let id: String
     let documentId: String
     let documentTitle: String

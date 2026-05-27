@@ -26,10 +26,8 @@ struct ChunkingService {
             .map { $0.trimmingCharacters(in: .init(charactersIn: " \t")) }
             .joined(separator: "\n")
 
-        // Collapse runs of 3+ newlines
-        while result.contains("\n\n\n") {
-            result = result.replacingOccurrences(of: "\n\n\n", with: "\n\n")
-        }
+        // Collapse runs of 3+ newlines into exactly 2
+        result = result.replacingOccurrences(of: "\n{3,}", with: "\n\n", options: .regularExpression)
         return result.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 

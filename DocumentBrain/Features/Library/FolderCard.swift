@@ -32,7 +32,7 @@ struct FolderCard: View {
                     .lineLimit(2)
                     .foregroundStyle(.primary)
 
-                Text("\(documentCount) doc\(documentCount == 1 ? "" : "s")")
+                Text(AppLanguage.current.libraryItemCount(documentCount))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }

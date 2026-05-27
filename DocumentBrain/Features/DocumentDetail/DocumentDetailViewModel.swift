@@ -14,7 +14,7 @@ final class DocumentDetailViewModel: ObservableObject {
         do {
             document = try await repository.fetchOne(id: documentId)
         } catch {
-            print("Error cargando documento: \(error)")
+            AppLogger.error("Error cargando documento: \(error)")
         }
     }
 

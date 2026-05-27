@@ -112,10 +112,7 @@ struct LibraryView: View {
                 }
                 Button(lang.cancelButton, role: .cancel) { newFolderName = "" }
             }
-            .alert(lang.libraryRenameFolderTitle, isPresented: Binding(
-                get: { folderToRename != nil },
-                set: { if !$0 { folderToRename = nil } }
-            )) {
+            .alert(lang.libraryRenameFolderTitle, isPresented: .isPresent($folderToRename)) {
                 TextField(lang.libraryFolderNameField, text: $renameFolderName)
                 Button(lang.libraryRename) {
                     if let folder = folderToRename {
@@ -129,11 +126,8 @@ struct LibraryView: View {
                     renameFolderName = ""
                 }
             }
-            .alert("Error", isPresented: Binding(
-                get: { viewModel.userErrorMessage != nil },
-                set: { if !$0 { viewModel.userErrorMessage = nil } }
-            )) {
-                Button("OK", role: .cancel) { viewModel.userErrorMessage = nil }
+            .alert("Error", isPresented: .isPresent($viewModel.userErrorMessage)) {
+                Button(lang.okButton, role: .cancel) { viewModel.userErrorMessage = nil }
             } message: {
                 Text(viewModel.userErrorMessage ?? lang.errorGeneric)
             }

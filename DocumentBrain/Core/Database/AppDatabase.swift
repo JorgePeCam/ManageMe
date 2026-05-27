@@ -193,7 +193,7 @@ final class AppDatabase {
             for row in rows {
                 let id: String = row["id"]
                 let rawTitle: String = row["title"]
-                let cleaned = Self.cleanTitle(rawTitle)
+                let cleaned = String.cleanedDocumentTitle(rawTitle)
                 if cleaned != rawTitle {
                     try db.execute(
                         sql: "UPDATE document SET title = ?, needsSyncPush = 1 WHERE id = ?",
@@ -210,7 +210,7 @@ final class AppDatabase {
             for row in rows {
                 let id: String = row["id"]
                 let rawTitle: String = row["title"]
-                let cleaned = Self.cleanTitle(rawTitle)
+                let cleaned = String.cleanedDocumentTitle(rawTitle)
                 if cleaned != rawTitle {
                     try db.execute(
                         sql: "UPDATE document SET title = ?, needsSyncPush = 1 WHERE id = ?",
@@ -223,47 +223,4 @@ final class AppDatabase {
         return migrator
     }
 
-    /// Clean a document title by removing hex hashes, UUIDs, and Base64 tokens.
-    /// Mirrors LibraryViewModel.cleanDocumentTitle but available at DB level.
-    private static func cleanTitle(_ raw: String) -> String {
-        var title = raw
-
-        // Remove leading UUIDs
-        title = title.replacingOccurrences(
-            of: "^(?:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}[_ -]?)+",
-            with: "", options: .regularExpression
-        )
-        // Remove leading hex hashes (16+ chars)
-        title = title.replacingOccurrences(
-            of: "^[A-Fa-f0-9]{16,}[_ -]?",
-            with: "", options: .regularExpression
-        )
-        // Remove trailing Base64-like tokens
-        title = title.replacingOccurrences(
-            of: "[_ -][A-Za-z0-9+/]{12,}=*$",
-            with: "", options: .regularExpression
-        )
-        title = title.replacingOccurrences(
-            of: "\\s+[A-Za-z0-9]{12,}$",
-            with: "", options: .regularExpression
-        )
-        // Remove alphanumeric codes (booking refs, ticket IDs) — mixed letters+digits, 6+ chars
-        title = title.replacingOccurrences(
-            of: "\\s+(?=[A-Za-z0-9]*[A-Z])(?=[A-Za-z0-9]*[0-9])[A-Z0-9]{6,}$",
-            with: "", options: .regularExpression
-        )
-        title = title.replacingOccurrences(
-            of: "^(?=[A-Za-z0-9]*[A-Z])(?=[A-Za-z0-9]*[0-9])[A-Z0-9]{6,}[_ -]+",
-            with: "", options: .regularExpression
-        )
-        // Clean separators
-        title = title
-            .replacingOccurrences(of: "_", with: " ")
-            .replacingOccurrences(of: "-", with: " ")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        while title.contains("  ") {
-            title = title.replacingOccurrences(of: "  ", with: " ")
-        }
-        return title.isEmpty ? "Documento importado" : title
-    }
 }

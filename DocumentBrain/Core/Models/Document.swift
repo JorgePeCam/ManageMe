@@ -34,6 +34,20 @@ enum FileType: String, Codable, CaseIterable {
         case .unknown: return "doc"
         }
     }
+
+    /// Detects the file type from a URL's path extension.
+    static func detect(from url: URL) -> FileType {
+        switch url.pathExtension.lowercased() {
+        case "pdf":                             return .pdf
+        case "jpg", "jpeg", "png", "heic",
+             "heif", "tiff", "bmp", "webp":    return .image
+        case "docx":                            return .docx
+        case "xlsx":                            return .xlsx
+        case "txt", "md", "csv", "rtf":        return .text
+        case "eml":                             return .email
+        default:                               return .unknown
+        }
+    }
 }
 
 enum ProcessingStatus: String, Codable {
@@ -43,6 +57,14 @@ enum ProcessingStatus: String, Codable {
     case embedding
     case ready
     case error
+
+    /// True while the document is going through the ingestion pipeline.
+    var isInProgress: Bool {
+        switch self {
+        case .pending, .extracting, .chunking, .embedding: return true
+        case .ready, .error: return false
+        }
+    }
 }
 
 enum SourceType: String, Codable {

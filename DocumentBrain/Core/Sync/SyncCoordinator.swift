@@ -120,7 +120,7 @@ final class SyncCoordinator: NSObject, ObservableObject {
                 engine.state.add(pendingRecordZoneChanges: [.deleteRecord(id)])
             }
         } catch {
-            print("SyncCoordinator: Error scheduling pending changes — \(error)")
+            AppLogger.debug("[Sync] Error scheduling pending changes — \(error)")
         }
     }
 
@@ -136,7 +136,7 @@ final class SyncCoordinator: NSObject, ObservableObject {
                 return try JSONDecoder().decode(CKSyncEngine.State.Serialization.self, from: data)
             }
         } catch {
-            print("SyncCoordinator: Error loading sync state — \(error)")
+            AppLogger.debug("[Sync] Error loading sync state — \(error)")
             return nil
         }
     }
@@ -152,7 +152,7 @@ final class SyncCoordinator: NSObject, ObservableObject {
                     )
                 }
             } catch {
-                print("SyncCoordinator: Error saving sync state — \(error)")
+                AppLogger.debug("[Sync] Error saving sync state — \(error)")
             }
         }
     }
@@ -179,7 +179,7 @@ final class SyncCoordinator: NSObject, ObservableObject {
                 )
             }
         } catch {
-            print("SyncCoordinator: Error removing pending deletion — \(error)")
+            AppLogger.debug("[Sync] Error removing pending deletion — \(error)")
         }
     }
 }
@@ -200,7 +200,7 @@ extension SyncCoordinator: CKSyncEngineDelegate {
         case .fetchedDatabaseChanges(let fetchedChanges):
             // Zone creations/deletions — for now, just log
             if !fetchedChanges.modifications.isEmpty {
-                print("SyncCoordinator: Fetched \(fetchedChanges.modifications.count) zone modifications")
+                AppLogger.debug("[Sync] Fetched \(fetchedChanges.modifications.count) zone modifications")
             }
 
         case .fetchedRecordZoneChanges(let fetchedChanges):
@@ -293,7 +293,7 @@ extension SyncCoordinator: CKSyncEngineDelegate {
                 }
             }
         } catch {
-            print("SyncCoordinator: Error building record map — \(error)")
+            AppLogger.debug("[Sync] Error building record map — \(error)")
         }
 
         return map
@@ -355,10 +355,10 @@ extension SyncCoordinator: CKSyncEngineDelegate {
                 try await conversationRepo.saveMessageFromSync(msg)
 
             default:
-                print("SyncCoordinator: Unknown record type \(record.recordType)")
+                AppLogger.debug("[Sync] Unknown record type \(record.recordType)")
             }
         } catch {
-            print("SyncCoordinator: Error applying incoming record — \(error)")
+            AppLogger.debug("[Sync] Error applying incoming record — \(error)")
         }
     }
 
@@ -366,16 +366,24 @@ extension SyncCoordinator: CKSyncEngineDelegate {
         let recordName = recordID.recordName
 
         do {
-            // We don't know the exact type from a deletion, so try all
-            // GRDB deleteOne silently succeeds if row doesn't exist
+            // Fetch the document's fileURL before deleting so we can clean up the file.
+            let fileURL: String? = try? await db.dbWriter.read { db in
+                try Document.fetchOne(db, key: recordName)?.fileURL
+            }
+
+            // We don't know the exact type from a deletion, so try all.
+            // GRDB deleteOne silently succeeds if row doesn't exist.
             try await db.dbWriter.write { db in
                 _ = try? Document.deleteOne(db, key: recordName)
                 _ = try? Folder.deleteOne(db, key: recordName)
                 _ = try? Conversation.deleteOne(db, key: recordName)
                 _ = try? PersistedChatMessage.deleteOne(db, key: recordName)
             }
+
+            // Remove the file from local storage if this was a document.
+            await SyncFileManager.shared.deleteLocalFile(relativePath: fileURL)
         } catch {
-            print("SyncCoordinator: Error applying deletion — \(error)")
+            AppLogger.debug("[Sync] Error applying deletion — \(error)")
         }
     }
 
@@ -425,7 +433,7 @@ extension SyncCoordinator: CKSyncEngineDelegate {
                     syncEngine?.state.add(pendingRecordZoneChanges: [.saveRecord(recordID)])
 
                 default:
-                    print("SyncCoordinator: Failed to save \(recordID.recordName): \(error.localizedDescription)")
+                    AppLogger.debug("[Sync] Failed to save \(recordID.recordName): \(error.localizedDescription)")
                     await MainActor.run {
                         syncError = "Error de sync: \(error.localizedDescription)"
                     }
@@ -465,9 +473,9 @@ extension SyncCoordinator: CKSyncEngineDelegate {
         let zone = CKRecordZone(zoneID: RecordMapper.zoneID)
         do {
             _ = try await container.privateCloudDatabase.save(zone)
-            print("SyncCoordinator: Created custom zone \(RecordMapper.zoneName)")
+            AppLogger.debug("[Sync] Created custom zone \(RecordMapper.zoneName)")
         } catch {
-            print("SyncCoordinator: Error creating zone — \(error)")
+            AppLogger.debug("[Sync] Error creating zone — \(error)")
         }
     }
 
@@ -483,7 +491,7 @@ extension SyncCoordinator: CKSyncEngineDelegate {
                 try db.execute(sql: "UPDATE chatMessage SET needsSyncPush = 1, syncChangeTag = NULL")
             }
         } catch {
-            print("SyncCoordinator: Error resetting sync state — \(error)")
+            AppLogger.debug("[Sync] Error resetting sync state — \(error)")
         }
     }
 

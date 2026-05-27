@@ -10,8 +10,8 @@ final class AppState {
     var reindexTotal = 0
 
     var isDebugMode: Bool {
-        get { UserDefaults.standard.bool(forKey: "rag_debug_mode") }
-        set { UserDefaults.standard.set(newValue, forKey: "rag_debug_mode") }
+        get { UserDefaults.standard.bool(forKey: UserDefaultsKeys.ragDebugMode) }
+        set { UserDefaults.standard.set(newValue, forKey: UserDefaultsKeys.ragDebugMode) }
     }
 
     var reindexProgress: Double {

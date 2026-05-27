@@ -6,6 +6,7 @@ actor ThumbnailService {
 
     private let fileManager = FileManager.default
     private var cache: [String: UIImage] = [:]
+    private let thumbnailSize: CGFloat = 300
 
     /// Returns a thumbnail for the document, generating and caching it if needed
     func thumbnail(for document: Document) async -> UIImage? {
@@ -57,9 +58,8 @@ actor ThumbnailService {
               let page = document.page(at: 0) else { return nil }
 
         let bounds = page.bounds(for: .mediaBox)
-        let targetWidth: CGFloat = 300
-        let scale = targetWidth / bounds.width
-        let targetSize = CGSize(width: targetWidth, height: bounds.height * scale)
+        let scale = thumbnailSize / bounds.width
+        let targetSize = CGSize(width: thumbnailSize, height: bounds.height * scale)
 
         let renderer = UIGraphicsImageRenderer(size: targetSize)
         return renderer.image { context in
@@ -74,12 +74,11 @@ actor ThumbnailService {
         guard let data = try? Data(contentsOf: url),
               let original = UIImage(data: data) else { return nil }
 
-        let maxDimension: CGFloat = 300
         let scale: CGFloat
         if original.size.width > original.size.height {
-            scale = maxDimension / original.size.width
+            scale = thumbnailSize / original.size.width
         } else {
-            scale = maxDimension / original.size.height
+            scale = thumbnailSize / original.size.height
         }
 
         let targetSize = CGSize(

@@ -21,14 +21,12 @@ struct ReindexingOverlay: View {
                     .symbolEffect(.pulse)
 
                 VStack(spacing: 8) {
-                    Text(lang == .spanish ? "Actualizando documentos\(dots)" : "Updating documents\(dots)")
+                    Text("\(lang.reindexOverlayTitle)\(dots)")
                         .font(.title3.bold())
                         .foregroundStyle(.white)
                         .animation(nil, value: dots)
 
-                    Text(lang == .spanish
-                         ? "El modelo de IA ha sido actualizado.\nReindexando tus documentos…"
-                         : "The AI model has been updated.\nReindexing your documents…")
+                    Text(lang.reindexOverlaySubtitle)
                         .font(.subheadline)
                         .foregroundStyle(.white.opacity(0.7))
                         .multilineTextAlignment(.center)

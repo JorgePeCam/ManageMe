@@ -73,7 +73,7 @@ struct SettingsView: View {
 
                 // iCloud Sync
                 if #available(iOS 17.0, *) {
-                    iCloudSyncSection
+                    iCloudSyncSectionView(coordinator: SyncCoordinator.shared, lang: lang)
                 }
 
                 // Storage
@@ -153,7 +153,7 @@ struct SettingsView: View {
                     HStack {
                         Label(lang.versionLabel, systemImage: "info.circle")
                         Spacer()
-                        Text("1.0.0")
+                        Text(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—")
                             .foregroundStyle(.secondary)
                     }
                 } header: {
@@ -178,13 +178,8 @@ struct SettingsView: View {
             .task {
                 await viewModel.loadStats()
             }
-            .alert("Error", isPresented: Binding(
-                get: { viewModel.userErrorMessage != nil },
-                set: { isPresented in
-                    if !isPresented { viewModel.userErrorMessage = nil }
-                }
-            )) {
-                Button("OK", role: .cancel) {
+            .alert("Error", isPresented: .isPresent($viewModel.userErrorMessage)) {
+                Button(lang.okButton, role: .cancel) {
                     viewModel.userErrorMessage = nil
                 }
             } message: {
@@ -193,22 +188,28 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - iCloud Sync Section
+}
 
-    @available(iOS 17.0, *)
-    private var iCloudSyncSection: some View {
+// MARK: - iCloud Sync Section
+
+@available(iOS 17.0, *)
+private struct iCloudSyncSectionView: View {
+    @ObservedObject var coordinator: SyncCoordinator
+    let lang: AppLanguage
+
+    var body: some View {
         Section {
             HStack(spacing: 12) {
                 Image(systemName: "icloud")
                     .font(.title3)
-                    .foregroundStyle(SyncCoordinator.shared.iCloudAvailable ? Color.appAccent : .secondary)
+                    .foregroundStyle(coordinator.iCloudAvailable ? Color.appAccent : .secondary)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(lang.iCloudTitle)
                         .font(.subheadline)
                         .fontWeight(.medium)
 
-                    if SyncCoordinator.shared.isSyncing {
+                    if coordinator.isSyncing {
                         HStack(spacing: 4) {
                             ProgressView()
                                 .scaleEffect(0.7)
@@ -216,11 +217,7 @@ struct SettingsView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
-                    } else if SyncCoordinator.shared.lastSyncDate != nil {
-                        Text(lang.iCloudActive)
-                            .font(.caption)
-                            .foregroundStyle(Color.appSuccess)
-                    } else if SyncCoordinator.shared.iCloudAvailable {
+                    } else if coordinator.lastSyncDate != nil || coordinator.iCloudAvailable {
                         Text(lang.iCloudActive)
                             .font(.caption)
                             .foregroundStyle(Color.appSuccess)
@@ -233,11 +230,11 @@ struct SettingsView: View {
 
                 Spacer()
 
-                Image(systemName: SyncCoordinator.shared.iCloudAvailable ? "checkmark.circle.fill" : "xmark.circle")
-                    .foregroundStyle(SyncCoordinator.shared.iCloudAvailable ? Color.appSuccess : .secondary)
+                Image(systemName: coordinator.iCloudAvailable ? "checkmark.circle.fill" : "xmark.circle")
+                    .foregroundStyle(coordinator.iCloudAvailable ? Color.appSuccess : .secondary)
             }
 
-            if let error = SyncCoordinator.shared.syncError {
+            if let error = coordinator.syncError {
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)

@@ -204,24 +204,9 @@ struct TextExtractionService {
 
     // MARK: - File Type Detection
 
+    @available(*, deprecated, renamed: "FileType.detect(from:)")
     static func detectFileType(from url: URL) -> FileType {
-        let ext = url.pathExtension.lowercased()
-        switch ext {
-        case "pdf":
-            return .pdf
-        case "jpg", "jpeg", "png", "heic", "heif", "tiff", "bmp":
-            return .image
-        case "docx":
-            return .docx
-        case "xlsx":
-            return .xlsx
-        case "txt", "md", "csv", "rtf":
-            return .text
-        case "eml":
-            return .email
-        default:
-            return .unknown
-        }
+        FileType.detect(from: url)
     }
 }
 

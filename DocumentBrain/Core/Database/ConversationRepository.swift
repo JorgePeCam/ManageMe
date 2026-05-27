@@ -2,7 +2,13 @@ import Foundation
 import GRDB
 
 struct ConversationRepository {
-    private var dbWriter: any DatabaseWriter { AppDatabase.shared.dbWriter }
+    private let db: AppDatabase
+
+    init(db: AppDatabase = .shared) {
+        self.db = db
+    }
+
+    private var dbWriter: any DatabaseWriter { db.dbWriter }
 
     // MARK: - Conversations
 

@@ -4,15 +4,15 @@ import SwiftUI
 @main
 struct DocumentBrainApp: App {
     @Environment(\.scenePhase) private var scenePhase
-    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @AppStorage(UserDefaultsKeys.hasCompletedOnboarding) private var hasCompletedOnboarding = false
 
     init() {
         // Only filesystem work here — fast and required before any file access.
         do {
             try DocumentRepository.ensureStorageDirectories()
         } catch {
-            print("Error creando directorios de almacenamiento: \(error.localizedDescription)")
-            UserDefaults.standard.set(error.localizedDescription, forKey: "startup_storage_error")
+            AppLogger.error("Error creando directorios de almacenamiento: \(error.localizedDescription)")
+            UserDefaults.standard.set(error.localizedDescription, forKey: UserDefaultsKeys.startupStorageError)
         }
     }
 
@@ -69,14 +69,14 @@ struct DocumentBrainApp: App {
     }
 
     private func checkModelVersion() async -> Bool {
-        let storedVersion = UserDefaults.standard.string(forKey: "embeddingModelVersion") ?? ""
+        let storedVersion = UserDefaults.standard.string(forKey: UserDefaultsKeys.embeddingModelVersion) ?? ""
         guard storedVersion != EmbeddingService.modelVersion else { return false }
 
         try? await AppDatabase.shared.dbWriter.write { db in
             try db.execute(sql: "DELETE FROM chunkVector")
             try db.execute(sql: "UPDATE document SET processingStatus = 'pending' WHERE processingStatus = 'ready'")
         }
-        UserDefaults.standard.set(EmbeddingService.modelVersion, forKey: "embeddingModelVersion")
+        UserDefaults.standard.set(EmbeddingService.modelVersion, forKey: UserDefaultsKeys.embeddingModelVersion)
         return true
     }
 }

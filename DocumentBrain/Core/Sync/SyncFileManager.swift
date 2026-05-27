@@ -34,7 +34,7 @@ actor SyncFileManager {
             try fileManager.copyItem(at: assetURL, to: destinationURL)
             return relativePath
         } catch {
-            print("SyncFileManager: Error copiando asset — \(error.localizedDescription)")
+            AppLogger.error("[SyncFileManager] Error copiando asset — \(error.localizedDescription)")
             return nil
         }
     }

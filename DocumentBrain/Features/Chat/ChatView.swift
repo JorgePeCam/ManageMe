@@ -44,7 +44,7 @@ struct ChatView: View {
                         Image(systemName: "plus.bubble")
                             .foregroundStyle(Color.appAccent)
                     }
-                    .accessibilityLabel(AppLanguage.current == .spanish ? "Nueva conversación" : "New conversation")
+                    .accessibilityLabel(AppLanguage.current.accessibilityNewConversation)
                 }
             }
             .sheet(isPresented: $showHistory) {
@@ -249,7 +249,7 @@ struct ChatView: View {
                     .clipShape(Circle())
             }
             .disabled(viewModel.queryText.isEmpty || viewModel.isSearching)
-            .accessibilityLabel(AppLanguage.current == .spanish ? "Enviar" : "Send")
+            .accessibilityLabel(AppLanguage.current.accessibilitySend)
         }
         .padding(.horizontal, AppStyle.padding)
         .padding(.vertical, 10)
@@ -816,23 +816,4 @@ struct RAGDebugPanel: View {
     }
 }
 
-// MARK: - Date Extension
-
-extension Date {
-    var relativeFormatted: String {
-        let calendar = Calendar.current
-        let lang = AppLanguage.current
-        if calendar.isDateInToday(self) {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "HH:mm"
-            return formatter.string(from: self)
-        } else if calendar.isDateInYesterday(self) {
-            return lang.dateYesterday
-        } else {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "d MMM"
-            formatter.locale = Locale(identifier: lang == .spanish ? "es_ES" : "en_US")
-            return formatter.string(from: self)
-        }
-    }
-}
+// Date.relativeFormatted is defined in Extensions.swift

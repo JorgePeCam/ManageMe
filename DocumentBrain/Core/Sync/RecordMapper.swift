@@ -18,14 +18,14 @@ enum RecordMapper {
 
     // MARK: - Document ↔ CKRecord
 
-    static func recordID(for id: String, recordType: String) -> CKRecord.ID {
+    static func recordID(for id: String) -> CKRecord.ID {
         CKRecord.ID(recordName: id, zoneID: zoneID)
     }
 
     static func record(from doc: Document, existingRecord: CKRecord? = nil) -> CKRecord {
         let record = existingRecord ?? CKRecord(
             recordType: RecordType.document,
-            recordID: recordID(for: doc.id, recordType: RecordType.document)
+            recordID: recordID(for: doc.id)
         )
 
         record["title"] = doc.title as CKRecordValue
@@ -78,7 +78,7 @@ enum RecordMapper {
     static func record(from folder: Folder, existingRecord: CKRecord? = nil) -> CKRecord {
         let record = existingRecord ?? CKRecord(
             recordType: RecordType.folder,
-            recordID: recordID(for: folder.id, recordType: RecordType.folder)
+            recordID: recordID(for: folder.id)
         )
 
         record["name"] = folder.name as CKRecordValue
@@ -111,7 +111,7 @@ enum RecordMapper {
     static func record(from conv: Conversation, existingRecord: CKRecord? = nil) -> CKRecord {
         let record = existingRecord ?? CKRecord(
             recordType: RecordType.conversation,
-            recordID: recordID(for: conv.id, recordType: RecordType.conversation)
+            recordID: recordID(for: conv.id)
         )
 
         record["title"] = conv.title as CKRecordValue
@@ -144,7 +144,7 @@ enum RecordMapper {
     static func record(from msg: PersistedChatMessage, existingRecord: CKRecord? = nil) -> CKRecord {
         let record = existingRecord ?? CKRecord(
             recordType: RecordType.chatMessage,
-            recordID: recordID(for: msg.id, recordType: RecordType.chatMessage)
+            recordID: recordID(for: msg.id)
         )
 
         record["conversationId"] = msg.conversationId as CKRecordValue

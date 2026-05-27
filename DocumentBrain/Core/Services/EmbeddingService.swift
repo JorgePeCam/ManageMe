@@ -11,7 +11,7 @@ final class EmbeddingService {
         do {
             return try EmbeddingService()
         } catch {
-            print("Error inicializando EmbeddingService: \(error)")
+            AppLogger.error("Error inicializando EmbeddingService: \(error)")
             return nil
         }
     }()
@@ -43,15 +43,6 @@ final class EmbeddingService {
         return extractEmbedding(from: output.embedding)
     }
 
-    func generateEmbeddings(for texts: [String]) async throws -> [[Float]] {
-        var results: [[Float]] = []
-        for text in texts {
-            let embedding = try await generateEmbedding(for: text)
-            results.append(embedding)
-        }
-        return results
-    }
-
     private func extractEmbedding(from multiArray: MLMultiArray) -> [Float] {
         let dim = Self.embeddingDimension
         var embedding = [Float](repeating: 0, count: dim)
@@ -64,12 +55,10 @@ final class EmbeddingService {
 
 enum EmbeddingError: LocalizedError {
     case vocabNotFound
-    case modelNotAvailable
 
     var errorDescription: String? {
         switch self {
         case .vocabNotFound: return "No se encontró vocab.txt en el bundle"
-        case .modelNotAvailable: return "El modelo de embeddings no está disponible"
         }
     }
 }

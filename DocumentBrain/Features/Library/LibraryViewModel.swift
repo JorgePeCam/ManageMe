@@ -71,19 +71,12 @@ final class LibraryViewModel: ObservableObject {
         }
     }
 
-    var hasProcessingDocuments: Bool {
-        documents.contains { doc in
-            let status = doc.processingStatusEnum
-            return status == .pending || status == .extracting || status == .chunking || status == .embedding
-        }
+    private var processingDocuments: [Document] {
+        documents.filter { $0.processingStatusEnum.isInProgress }
     }
 
-    var processingCount: Int {
-        documents.filter { doc in
-            let status = doc.processingStatusEnum
-            return status == .pending || status == .extracting || status == .chunking || status == .embedding
-        }.count
-    }
+    var hasProcessingDocuments: Bool { !processingDocuments.isEmpty }
+    var processingCount: Int { processingDocuments.count }
 
     var isInFolder: Bool {
         currentFolderId != nil
@@ -258,12 +251,12 @@ final class LibraryViewModel: ObservableObject {
     // MARK: - Import Logic
 
     private func importFile(from url: URL) async {
-        let fileType = TextExtractionService.detectFileType(from: url)
+        let fileType = FileType.detect(from: url)
         let title = url.deletingPathExtension().lastPathComponent
 
         do {
             let (relativePath, fileSize) = try repository.importFile(from: url, fileType: fileType)
-            let cleanTitle = Self.cleanDocumentTitle(title)
+            let cleanTitle = String.cleanedDocumentTitle(title)
 
             let document = Document(
                 title: cleanTitle,
@@ -286,66 +279,6 @@ final class LibraryViewModel: ObservableObject {
             AppLogger.error("Error importando archivo: \(error.localizedDescription)")
             userErrorMessage = AppLanguage.current.errorSaveFile
         }
-    }
-
-    /// Cleans a filename into a human-readable document title.
-    /// Removes hex hashes, UUIDs, Base64 tokens, underscores, and hyphens.
-    static func cleanDocumentTitle(_ raw: String) -> String {
-        var title = raw
-
-        // Remove leading UUID prefixes (with or without trailing separator)
-        title = title.replacingOccurrences(
-            of: "^(?:[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}[_ -]?)+",
-            with: "",
-            options: .regularExpression
-        )
-
-        // Remove leading hex hashes (16+ hex chars) like MD5, SHA fragments
-        title = title.replacingOccurrences(
-            of: "^[A-Fa-f0-9]{16,}[_ -]?",
-            with: "",
-            options: .regularExpression
-        )
-
-        // Remove trailing Base64-like tokens (12+ alphanumeric chars at end)
-        title = title.replacingOccurrences(
-            of: "[_ -][A-Za-z0-9+/]{12,}=*$",
-            with: "",
-            options: .regularExpression
-        )
-        // Also remove space-separated Base64/hash tokens at the end
-        title = title.replacingOccurrences(
-            of: "\\s+[A-Za-z0-9]{12,}$",
-            with: "",
-            options: .regularExpression
-        )
-
-        // Remove alphanumeric codes that mix letters+digits (booking refs, ticket IDs)
-        // e.g. "J3ZN2TEN6", "AB12CD34" — at least 6 chars, must contain both letters and digits
-        title = title.replacingOccurrences(
-            of: "\\s+(?=[A-Za-z0-9]*[A-Z])(?=[A-Za-z0-9]*[0-9])[A-Z0-9]{6,}$",
-            with: "",
-            options: .regularExpression
-        )
-        // Same pattern at the start
-        title = title.replacingOccurrences(
-            of: "^(?=[A-Za-z0-9]*[A-Z])(?=[A-Za-z0-9]*[0-9])[A-Z0-9]{6,}[_ -]+",
-            with: "",
-            options: .regularExpression
-        )
-
-        // Clean separators
-        title = title
-            .replacingOccurrences(of: "_", with: " ")
-            .replacingOccurrences(of: "-", with: " ")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-
-        // Collapse multiple spaces
-        while title.contains("  ") {
-            title = title.replacingOccurrences(of: "  ", with: " ")
-        }
-
-        return title.isEmpty ? AppLanguage.current.libraryImportedDocument : title
     }
 
     private func importCameraImage(_ image: UIImage) async {
