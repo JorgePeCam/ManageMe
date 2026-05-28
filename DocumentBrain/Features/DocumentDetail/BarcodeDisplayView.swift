@@ -159,7 +159,8 @@ struct BarcodeDisplayView: View {
     private func generatePDF417(from string: String) -> UIImage? {
         guard let filter = CIFilter(name: "CIPDF417BarcodeGenerator") else { return nil }
         filter.setValue(Data(string.utf8), forKey: "inputMessage")
-        filter.setValue(2, forKey: "inputMinErrorCorrectionPercent")
+        // inputCorrectionLevel: 0–8 (2 = standard error correction)
+        filter.setValue(2, forKey: "inputCorrectionLevel")
         guard let output = filter.outputImage else { return nil }
         let scaled = output.transformed(by: CGAffineTransform(scaleX: 3, y: 3))
         return render(ciImage: scaled)
