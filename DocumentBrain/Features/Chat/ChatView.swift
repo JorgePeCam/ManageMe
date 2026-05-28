@@ -527,9 +527,32 @@ struct MarkdownRenderer: View {
 
     private func inline(_ text: String) -> AttributedString {
         (try? AttributedString(
-            markdown: text,
+            markdown: linkify(text),
             options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
         )) ?? AttributedString(text)
+    }
+
+    /// Wraps bare URLs in markdown `[url](url)` so AttributedString renders them as tappable links.
+    private func linkify(_ text: String) -> String {
+        guard let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) else {
+            return text
+        }
+        let ns = text as NSString
+        let matches = detector.matches(in: text, range: NSRange(location: 0, length: ns.length))
+        var result = text
+        // Reverse order so replacements don't shift subsequent ranges
+        for match in matches.reversed() {
+            guard let range = Range(match.range, in: result) else { continue }
+            let raw = String(result[range])
+            // Skip if already inside a markdown link [...](...) — check char before
+            if range.lowerBound > result.startIndex {
+                let before = result[result.index(before: range.lowerBound)]
+                if before == "(" { continue }
+            }
+            let urlString = match.url?.absoluteString ?? raw
+            result.replaceSubrange(range, with: "[\(raw)](\(urlString))")
+        }
+        return result
     }
 
     private func numberedItem(_ line: String) -> (Int, String)? {
