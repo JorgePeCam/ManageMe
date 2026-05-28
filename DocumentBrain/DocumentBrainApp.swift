@@ -62,6 +62,11 @@ struct DocumentBrainApp: App {
             await DocumentProcessor.shared.recoverStuckDocuments()
         }
 
+        // Auto-extract metadata for documents that don't have it yet
+        Task(priority: .background) {
+            await DocumentProcessor.shared.extractMissingMetadata()
+        }
+
         // Pre-warm CoreML model in background so first search is instant
         Task(priority: .background) {
             _ = EmbeddingService.shared

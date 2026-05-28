@@ -261,9 +261,38 @@ struct DocumentDetailView: View {
 
             Divider()
 
-            // Data rows
+            // Flight / travel rows
+            if let origin = metadata.origin, let destination = metadata.destination {
+                routeRow(origin: origin, destination: destination)
+            } else if let origin = metadata.origin {
+                metadataRow(icon: "mappin", label: "Origen", value: origin)
+            } else if let destination = metadata.destination {
+                metadataRow(icon: "mappin.and.ellipse", label: "Destino", value: destination)
+            }
+
+            if let flightNumber = metadata.flightNumber {
+                metadataRow(icon: "airplane", label: "Vuelo", value: flightNumber)
+            }
+
+            if let dep = metadata.departureTime, let arr = metadata.arrivalTime {
+                metadataRow(icon: "clock", label: "Horario", value: "\(dep) → \(arr)")
+            } else if let dep = metadata.departureTime {
+                let label = metadata.documentType == .event ? "Hora" : "Salida"
+                metadataRow(icon: "clock", label: label, value: dep)
+            }
+
+            if let seat = metadata.seat {
+                metadataRow(icon: "carseat.right.fill", label: "Asiento", value: seat)
+            }
+
+            // Event title
+            if let title = metadata.eventTitle {
+                metadataRow(icon: "music.note", label: "Evento", value: title)
+            }
+
+            // Common rows
             if let vendor = metadata.vendor {
-                metadataRow(icon: "building.2", label: "Emisor", value: vendor)
+                metadataRow(icon: "building.2", label: vendorLabel(for: metadata), value: vendor)
             }
             if let date = metadata.formattedDate {
                 metadataRow(icon: "calendar", label: "Fecha", value: date)
@@ -274,6 +303,37 @@ struct DocumentDetailView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .cardStyle()
+    }
+
+    private func vendorLabel(for metadata: StructuredDocumentData) -> String {
+        switch metadata.documentType {
+        case .flight: return "Aerolínea"
+        case .event:  return "Recinto"
+        default:      return "Emisor"
+        }
+    }
+
+    private func routeRow(origin: String, destination: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "airplane")
+                .font(.caption)
+                .foregroundStyle(Color.appAccent)
+                .frame(width: 18)
+
+            Text(origin)
+                .font(.subheadline)
+                .fontWeight(.medium)
+
+            Image(systemName: "arrow.right")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
+            Text(destination)
+                .font(.subheadline)
+                .fontWeight(.medium)
+
+            Spacer()
+        }
     }
 
     private func metadataRow(icon: String, label: String, value: String, highlight: Bool = false) -> some View {

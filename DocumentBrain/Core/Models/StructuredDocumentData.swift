@@ -14,6 +14,8 @@ struct StructuredDocumentData: Codable, Equatable {
         case statement   = "extracto"
         case ticket      = "ticket"
         case budget      = "presupuesto"
+        case flight      = "vuelo"
+        case event       = "evento"
         case other       = "otro"
 
         var displayName: String {
@@ -25,6 +27,8 @@ struct StructuredDocumentData: Codable, Equatable {
             case .statement: return "Extracto"
             case .ticket:    return "Ticket"
             case .budget:    return "Presupuesto"
+            case .flight:    return "Vuelo"
+            case .event:     return "Entrada"
             case .other:     return "Documento"
             }
         }
@@ -38,8 +42,15 @@ struct StructuredDocumentData: Codable, Equatable {
             case .statement: return "list.bullet.rectangle.fill"
             case .ticket:    return "ticket.fill"
             case .budget:    return "tablecells.fill"
+            case .flight:    return "airplane"
+            case .event:     return "music.note.list"
             case .other:     return "doc.fill"
             }
+        }
+
+        /// Whether this type may have travel/event-specific fields
+        var isTravelOrEvent: Bool {
+            self == .flight || self == .event || self == .ticket
         }
     }
 
@@ -94,10 +105,10 @@ struct StructuredDocumentData: Codable, Equatable {
         }
     }
 
-    // MARK: - Fields
+    // MARK: - Core fields (all document types)
 
     var documentType: DocumentType?
-    /// Vendor, merchant, or issuer name
+    /// Vendor, merchant, issuer, or airline name
     var vendor: String?
     /// ISO date string: YYYY-MM-DD
     var date: String?
@@ -105,6 +116,23 @@ struct StructuredDocumentData: Codable, Equatable {
     /// ISO 4217 currency code: EUR, USD, GBP…
     var currency: String?
     var category: Category?
+
+    // MARK: - Travel / event fields (flights, tickets, events)
+
+    /// Origin city or airport code (e.g. "Madrid", "MAD")
+    var origin: String?
+    /// Destination city or airport code (e.g. "Barcelona", "BCN")
+    var destination: String?
+    /// Flight or train number (e.g. "IB6250", "AVE 02154")
+    var flightNumber: String?
+    /// Departure or event start time — HH:MM
+    var departureTime: String?
+    /// Arrival time — HH:MM
+    var arrivalTime: String?
+    /// Assigned seat or row (e.g. "23A", "Fila 12 Butaca 4")
+    var seat: String?
+    /// Concert, show, or event name
+    var eventTitle: String?
 
     // MARK: - Computed helpers
 

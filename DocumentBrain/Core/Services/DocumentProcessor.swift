@@ -41,6 +41,23 @@ actor DocumentProcessor {
         await process(documentId: documentId)
     }
 
+    /// Background sweep: extracts metadata for all ready documents that don't have it yet.
+    func extractMissingMetadata() async {
+        guard let docs = try? await documentRepo.fetchAll() else { return }
+        let missing = docs.filter {
+            $0.processingStatusEnum == .ready &&
+            $0.structuredData == nil &&
+            !$0.content.isEmpty
+        }
+        guard !missing.isEmpty else { return }
+        AppLogger.debug("[Processor] Auto-metadata sweep: \(missing.count) document(s) pending")
+        for doc in missing {
+            await extractMetadata(documentId: doc.id, text: doc.content, title: doc.title)
+            // Brief pause between calls to avoid hammering the worker
+            try? await Task.sleep(nanoseconds: 500_000_000)
+        }
+    }
+
     /// Resets documents stuck in intermediate states (crash recovery) and reprocesses them.
     func recoverStuckDocuments() async {
         guard let docs = try? await documentRepo.fetchAll() else { return }

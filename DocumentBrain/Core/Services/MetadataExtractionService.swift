@@ -43,20 +43,35 @@ struct MetadataExtractionService {
     private func buildPrompt(text: String, title: String) -> String {
         let truncated = String(text.prefix(3000))
         return """
-        Analiza el siguiente documento y extrae datos estructurados si es relevante (factura, recibo, contrato, nómina, ticket, presupuesto, extracto bancario u otro documento con datos concretos).
+        Analiza el siguiente documento y extrae datos estructurados si es relevante (factura, recibo, contrato, nómina, ticket, presupuesto, extracto bancario, billete de avión/tren, entrada de concierto/evento u otro documento con datos concretos).
 
-        Si el documento NO contiene datos estructurados relevantes (es un artículo de opinión, un libro, una nota sin datos económicos, etc.), responde con:
+        Si el documento NO contiene datos estructurados relevantes (es un artículo de opinión, un libro, una nota sin datos concretos, etc.), responde con:
         {"isEmpty": true}
 
-        Si SÍ tiene datos estructurados, responde ÚNICAMENTE con JSON válido sin texto adicional ni bloques de código:
+        Si SÍ tiene datos estructurados, responde ÚNICAMENTE con JSON válido sin texto adicional ni bloques de código.
+
+        Campos obligatorios (usa null si no aparece el dato):
         {
-          "documentType": "factura|recibo|contrato|nómina|extracto|ticket|presupuesto|otro",
-          "vendor": "nombre del emisor, comercio o empresa (null si no aparece)",
-          "date": "YYYY-MM-DD (null si no aparece)",
-          "amount": número decimal sin símbolo de moneda (null si no aparece),
-          "currency": "EUR|USD|GBP|etc (null si no aparece o no es relevante)",
+          "documentType": "factura|recibo|contrato|nómina|extracto|ticket|presupuesto|vuelo|evento|otro",
+          "vendor": "nombre del emisor, aerolínea, organizador o comercio",
+          "date": "YYYY-MM-DD",
+          "amount": número decimal sin símbolo (null si no aplica),
+          "currency": "EUR|USD|GBP|etc",
           "category": "alimentación|transporte|salud|educación|entretenimiento|hogar|trabajo|finanzas|compras|suministros|viajes|otro"
         }
+
+        Campos adicionales para vuelos, trenes y transportes (incluye solo si aplica, omite el campo si no):
+          "origin": "ciudad o código de aeropuerto/estación de origen",
+          "destination": "ciudad o código de aeropuerto/estación de destino",
+          "flightNumber": "número de vuelo o tren (ej: IB6250, AVE 02154)",
+          "departureTime": "HH:MM hora de salida",
+          "arrivalTime": "HH:MM hora de llegada",
+          "seat": "asiento o plaza asignada"
+
+        Campos adicionales para eventos, conciertos y entradas (incluye solo si aplica):
+          "eventTitle": "nombre del evento, concierto o espectáculo",
+          "departureTime": "HH:MM hora del evento",
+          "seat": "fila y butaca asignada"
 
         Título del documento: \(title)
 
@@ -156,6 +171,15 @@ struct MetadataExtractionService {
         if let raw = json["category"] as? String {
             result.category = StructuredDocumentData.Category(rawValue: raw)
         }
+
+        // Travel / event fields
+        if let v = json["origin"] as? String, v != "null", !v.isEmpty { result.origin = v }
+        if let v = json["destination"] as? String, v != "null", !v.isEmpty { result.destination = v }
+        if let v = json["flightNumber"] as? String, v != "null", !v.isEmpty { result.flightNumber = v }
+        if let v = json["departureTime"] as? String, v != "null", !v.isEmpty { result.departureTime = v }
+        if let v = json["arrivalTime"] as? String, v != "null", !v.isEmpty { result.arrivalTime = v }
+        if let v = json["seat"] as? String, v != "null", !v.isEmpty { result.seat = v }
+        if let v = json["eventTitle"] as? String, v != "null", !v.isEmpty { result.eventTitle = v }
 
         return result.isEmpty ? nil : result
     }
