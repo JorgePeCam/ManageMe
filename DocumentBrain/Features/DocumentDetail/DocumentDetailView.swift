@@ -402,13 +402,15 @@ struct DocumentDetailView: View {
 
     // MARK: - Barcodes Card
 
+    @State private var selectedBarcode: String? = nil
+
     private func barcodesCard(_ payloads: [String]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
-                Image(systemName: "qrcode")
+                Image(systemName: "qrcode.viewfinder")
                     .font(.title3)
                     .foregroundStyle(Color.appAccent)
-                Text(payloads.count == 1 ? "Código QR / Barcode" : "\(payloads.count) Códigos QR / Barcode")
+                Text(payloads.count == 1 ? "Código digital" : "\(payloads.count) Códigos digitales")
                     .font(.subheadline)
                     .fontWeight(.semibold)
                 Spacer()
@@ -422,42 +424,49 @@ struct DocumentDetailView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .cardStyle()
+        .sheet(item: $selectedBarcode) { payload in
+            BarcodeDisplayView(payload: payload)
+        }
     }
 
     private func barcodeRow(_ payload: String) -> some View {
-        let isURL = URL(string: payload)?.scheme?.hasPrefix("http") == true
+        let kind = BarcodeKind(payload: payload)
 
-        return HStack(spacing: 10) {
-            Image(systemName: isURL ? "link" : "barcode")
-                .font(.caption)
+        return HStack(spacing: 12) {
+            Image(systemName: kind.systemImage)
+                .font(.title3)
                 .foregroundStyle(Color.appAccent)
-                .frame(width: 18)
+                .frame(width: 28)
 
-            Text(payload)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-                .truncationMode(.middle)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(kind.label)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                Text(kind.subtitle(for: payload))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
 
             Spacer()
 
-            if isURL, let url = URL(string: payload) {
+            if case .url(let url) = kind {
                 Link(destination: url) {
-                    Image(systemName: "safari")
+                    Label("Abrir", systemImage: "safari")
                         .font(.caption)
                         .foregroundStyle(Color.appAccent)
                 }
             } else {
                 Button {
-                    UIPasteboard.general.string = payload
+                    selectedBarcode = payload
                 } label: {
-                    Image(systemName: "doc.on.doc")
+                    Label("Ver código", systemImage: "qrcode")
                         .font(.caption)
                         .foregroundStyle(Color.appAccent)
                 }
                 .buttonStyle(.plain)
             }
         }
+        .padding(.vertical, 2)
     }
 
     // MARK: - Extracted Text
