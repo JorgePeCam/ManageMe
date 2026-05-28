@@ -1,3 +1,4 @@
+import EventKit
 import SwiftUI
 import QuickLook
 import PDFKit
@@ -74,6 +75,26 @@ struct DocumentDetailView: View {
             }
         }
         .quickLookPreview($viewModel.previewURL)
+        .sheet(isPresented: $viewModel.showCalendarSheet) {
+            if let event = viewModel.calendarEvent {
+                CalendarEventSheet(
+                    event: event,
+                    store: EventKitService.shared.store,
+                    isPresented: $viewModel.showCalendarSheet
+                )
+                .ignoresSafeArea()
+            }
+        }
+        .alert("Sin acceso al Calendario", isPresented: $viewModel.calendarAccessDenied) {
+            Button("Abrir Ajustes") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }
+            Button("Cancelar", role: .cancel) {}
+        } message: {
+            Text("Permite el acceso al Calendario en Ajustes para añadir eventos desde tus documentos.")
+        }
         .task {
             await viewModel.load(documentId: documentId)
         }
@@ -303,6 +324,22 @@ struct DocumentDetailView: View {
             }
             if let amount = metadata.formattedAmount {
                 metadataRow(icon: "eurosign.circle", label: "Importe", value: amount, highlight: true)
+            }
+
+            // Calendar button — only when there is a parseable date
+            if metadata.date != nil {
+                Divider()
+                Button {
+                    viewModel.addToCalendar(metadata: metadata, documentTitle: document.title)
+                } label: {
+                    Label("Añadir al Calendario", systemImage: "calendar.badge.plus")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundStyle(Color.appAccent)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                }
+                .buttonStyle(.plain)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

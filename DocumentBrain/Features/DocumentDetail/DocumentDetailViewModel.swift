@@ -1,4 +1,5 @@
 import Combine
+import EventKit
 import Foundation
 
 @MainActor
@@ -8,6 +9,11 @@ final class DocumentDetailViewModel: ObservableObject {
     @Published var isExtractingMetadata = false
     /// `true` after a manual extraction attempt that returned no structured data.
     @Published var metadataNotFound = false
+
+    // Calendar
+    @Published var calendarEvent: EKEvent?
+    @Published var showCalendarSheet = false
+    @Published var calendarAccessDenied = false
 
     private let repository = DocumentRepository()
     private var documentId: String?
@@ -47,6 +53,22 @@ final class DocumentDetailViewModel: ObservableObject {
             if self.document?.structuredDataDecoded == nil {
                 metadataNotFound = true
             }
+        }
+    }
+
+    // MARK: - Calendar
+
+    func addToCalendar(metadata: StructuredDocumentData, documentTitle: String) {
+        calendarAccessDenied = false
+        Task {
+            let granted = await EventKitService.shared.requestAccess()
+            guard granted else {
+                calendarAccessDenied = true
+                return
+            }
+            guard let event = EventKitService.shared.makeEvent(from: metadata, documentTitle: documentTitle) else { return }
+            calendarEvent = event
+            showCalendarSheet = true
         }
     }
 
