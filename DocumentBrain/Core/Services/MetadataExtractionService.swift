@@ -24,7 +24,21 @@ struct MetadataExtractionService {
     // MARK: - Public API
 
     /// Returns `nil` if the document has no financial/structured content worth extracting.
+    /// Tries Apple Foundation Models (on-device, iOS 26+) first; falls back to Gemini via proxy.
     func extract(from text: String, documentTitle: String) async -> StructuredDocumentData? {
+        // 1. On-device extraction (iOS 26+, no network required)
+        if #available(iOS 26, *) {
+            let extractor = FoundationModelMetadataExtractor()
+            if extractor.isAvailable {
+                AppLogger.debug("[Metadata] Using Foundation Models (on-device)")
+                if let result = await extractor.extract(from: text, documentTitle: documentTitle) {
+                    return result
+                }
+                // nil means either no structured data or the model failed — fall through to Gemini
+            }
+        }
+
+        // 2. Gemini via Cloudflare proxy
         guard !Self.workerURL.isEmpty else { return nil }
 
         let prompt = buildPrompt(text: text, title: documentTitle)
