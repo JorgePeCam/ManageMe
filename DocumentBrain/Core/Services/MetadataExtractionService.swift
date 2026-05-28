@@ -79,10 +79,11 @@ struct MetadataExtractionService {
         request.timeoutInterval = 20
 
         let body: [String: Any] = [
+            "systemInstruction": ["parts": [["text": "You are a JSON extraction API. You MUST respond with ONLY a valid JSON object. No explanations, no markdown, no prose. Only JSON."]]],
             "contents": [["role": "user", "parts": [["text": prompt]]]],
             "generationConfig": [
-                "maxOutputTokens": 256,
-                "temperature": 0.1
+                "maxOutputTokens": 300,
+                "temperature": 0.0
             ]
         ]
 
