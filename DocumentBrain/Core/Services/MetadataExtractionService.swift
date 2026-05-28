@@ -41,7 +41,16 @@ struct MetadataExtractionService {
     // MARK: - Prompt
 
     private func buildPrompt(text: String, title: String) -> String {
-        let truncated = String(text.prefix(3000))
+        // Send beginning + end of document so boarding passes / multi-page PDFs
+        // don't lose key fields (flight numbers, seats) that appear at the end.
+        let truncated: String
+        if text.count <= 4000 {
+            truncated = text
+        } else {
+            let head = String(text.prefix(2500))
+            let tail = String(text.suffix(1000))
+            truncated = head + "\n…\n" + tail
+        }
         return """
         Analiza el siguiente documento y extrae datos estructurados. Puede ser una factura, recibo, contrato, nómina, extracto bancario, presupuesto, tarjeta de embarque (boarding pass), billete de tren/autobús, entrada de concierto/evento, ticket u otro documento con datos concretos.
 
