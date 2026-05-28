@@ -28,49 +28,109 @@ struct TextExtractionService {
 
     // MARK: - PDF Extraction
 
+    /// Pages with fewer than this many PDFKit characters also get a Vision OCR pass,
+    /// so that visual-only elements (boarding pass cards, rendered form fields) are captured.
+    private let ocrSupplementThreshold = 500
+
     private func extractFromPDF(url: URL) async throws -> String {
         guard let pdfDocument = PDFDocument(url: url) else {
             throw ExtractionError.cannotOpenFile
         }
 
-        var fullText = ""
+        var pageTexts: [String] = []
         for pageIndex in 0..<pdfDocument.pageCount {
             guard let page = pdfDocument.page(at: pageIndex) else { continue }
-
-            if let pageText = page.string, !pageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                // Page has selectable text
-                fullText += pageText + "\n\n"
-            } else {
-                // Scanned page - use OCR
-                let pageText = try await ocrPage(page)
-                fullText += pageText + "\n\n"
+            let text = try await extractPageText(page)
+            if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                pageTexts.append(text)
             }
         }
 
-        return fullText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return pageTexts.joined(separator: "\n\n").trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private func ocrPage(_ page: PDFPage) async throws -> String {
-        // Render PDF page to image for OCR
-        let pageRect = page.bounds(for: .mediaBox)
-        let scale: CGFloat = 2.0 // Higher resolution for better OCR
-        let imageSize = CGSize(
-            width: pageRect.width * scale,
-            height: pageRect.height * scale
-        )
+    private func extractPageText(_ page: PDFPage) async throws -> String {
+        let pdfText = page.string?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
 
+        // If the page has plenty of selectable text, PDFKit is sufficient
+        if pdfText.count >= ocrSupplementThreshold {
+            return pdfText
+        }
+
+        // Sparse or no selectable text — run Vision OCR to catch visual/rendered fields
+        let ocrText = try await ocrPage(page)
+
+        if pdfText.isEmpty { return ocrText }
+        if ocrText.isEmpty { return pdfText }
+
+        // Both have content: merge (PDFKit first, OCR supplement appended)
+        return pdfText + "\n" + ocrText
+    }
+
+    // MARK: - Barcode / QR detection
+
+    /// Detects barcode and QR code payloads from a PDF or image file.
+    /// Scans the first 3 pages of PDFs to keep processing fast.
+    func detectBarcodes(from url: URL, fileType: FileType) async -> [String] {
+        switch fileType {
+        case .pdf:
+            guard let doc = PDFDocument(url: url) else { return [] }
+            var found: [String] = []
+            for i in 0..<min(doc.pageCount, 3) {
+                guard let page = doc.page(at: i) else { continue }
+                let image = renderPage(page, scale: 2.0)
+                if let cg = image.cgImage {
+                    found.append(contentsOf: await detectBarcodes(in: cg))
+                }
+            }
+            return Array(Set(found))
+
+        case .image:
+            guard let data = try? Data(contentsOf: url),
+                  let uiImage = UIImage(data: data),
+                  let cg = uiImage.cgImage else { return [] }
+            return await detectBarcodes(in: cg)
+
+        default:
+            return []
+        }
+    }
+
+    private func detectBarcodes(in cgImage: CGImage) async -> [String] {
+        await withCheckedContinuation { continuation in
+            let request = VNDetectBarcodesRequest { request, _ in
+                let payloads = (request.results as? [VNBarcodeObservation])?
+                    .compactMap { $0.payloadStringValue }
+                    .filter { !$0.isEmpty } ?? []
+                continuation.resume(returning: payloads)
+            }
+            let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+            do {
+                try handler.perform([request])
+            } catch {
+                continuation.resume(returning: [])
+            }
+        }
+    }
+
+    // MARK: - Shared page renderer
+
+    private func renderPage(_ page: PDFPage, scale: CGFloat = 2.0) -> UIImage {
+        let pageRect = page.bounds(for: .mediaBox)
+        let imageSize = CGSize(width: pageRect.width * scale, height: pageRect.height * scale)
         let renderer = UIGraphicsImageRenderer(size: imageSize)
-        let image = renderer.image { context in
+        return renderer.image { context in
             context.cgContext.setFillColor(UIColor.white.cgColor)
             context.cgContext.fill(CGRect(origin: .zero, size: imageSize))
             context.cgContext.scaleBy(x: scale, y: scale)
             page.draw(with: .mediaBox, to: context.cgContext)
         }
+    }
 
-        guard let cgImage = image.cgImage else {
+    private func ocrPage(_ page: PDFPage) async throws -> String {
+        guard let cgImage = renderPage(page, scale: 2.0).cgImage else {
             throw ExtractionError.ocrFailed
         }
-
         return try await performOCR(on: cgImage)
     }
 

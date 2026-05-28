@@ -226,6 +226,12 @@ final class AppDatabase {
             }
         }
 
+        migrator.registerMigration("addBarcodes") { db in
+            try db.alter(table: "document") { t in
+                t.add(column: "barcodes", .text)
+            }
+        }
+
         return migrator
     }
 

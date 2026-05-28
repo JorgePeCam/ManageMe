@@ -21,7 +21,7 @@ final class DocumentDetailViewModel: ObservableObject {
         }
     }
 
-    /// Manually re-triggers metadata extraction for an already-processed document.
+    /// Manually re-triggers metadata extraction (and barcode detection) for an already-processed document.
     func extractMetadata() {
         guard let document, document.isReady, !document.content.isEmpty else { return }
         isExtractingMetadata = true
@@ -32,11 +32,18 @@ final class DocumentDetailViewModel: ObservableObject {
                 text: document.content,
                 title: document.title
             )
+            // Also re-scan for barcodes in case they were missed
+            if let url = document.absoluteFileURL {
+                await DocumentProcessor.shared.detectAndSaveBarcodes(
+                    documentId: document.id,
+                    fileURL: url,
+                    fileType: document.fileTypeEnum
+                )
+            }
             if let id = documentId {
                 await load(documentId: id)
             }
             isExtractingMetadata = false
-            // If still no metadata after extraction, surface a "not found" hint
             if self.document?.structuredDataDecoded == nil {
                 metadataNotFound = true
             }

@@ -98,6 +98,9 @@ struct Document: Identifiable, Codable, FetchableRecord, PersistableRecord {
     // Structured metadata extracted by LLM (JSON-encoded StructuredDocumentData)
     var structuredData: String?
 
+    // Barcode/QR payloads detected in the document (JSON-encoded [String])
+    var barcodes: String?
+
     init(
         id: String = UUID().uuidString,
         title: String,
@@ -146,6 +149,13 @@ struct Document: Identifiable, Codable, FetchableRecord, PersistableRecord {
 
     var isReady: Bool {
         processingStatusEnum == .ready
+    }
+
+    var barcodesDecoded: [String] {
+        guard let json = barcodes,
+              let data = json.data(using: .utf8),
+              let array = try? JSONDecoder().decode([String].self, from: data) else { return [] }
+        return array
     }
 
     var structuredDataDecoded: StructuredDocumentData? {

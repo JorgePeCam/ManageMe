@@ -27,6 +27,10 @@ struct DocumentDetailView: View {
                         extractMetadataButton
                     }
 
+                    if !document.barcodesDecoded.isEmpty {
+                        barcodesCard(document.barcodesDecoded)
+                    }
+
                     if document.absoluteFileURL != nil {
                         previewButton
                     }
@@ -392,6 +396,66 @@ struct DocumentDetailView: View {
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
+            }
+        }
+    }
+
+    // MARK: - Barcodes Card
+
+    private func barcodesCard(_ payloads: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                Image(systemName: "qrcode")
+                    .font(.title3)
+                    .foregroundStyle(Color.appAccent)
+                Text(payloads.count == 1 ? "Código QR / Barcode" : "\(payloads.count) Códigos QR / Barcode")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                Spacer()
+            }
+
+            Divider()
+
+            ForEach(Array(payloads.enumerated()), id: \.offset) { _, payload in
+                barcodeRow(payload)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardStyle()
+    }
+
+    private func barcodeRow(_ payload: String) -> some View {
+        let isURL = URL(string: payload)?.scheme?.hasPrefix("http") == true
+
+        return HStack(spacing: 10) {
+            Image(systemName: isURL ? "link" : "barcode")
+                .font(.caption)
+                .foregroundStyle(Color.appAccent)
+                .frame(width: 18)
+
+            Text(payload)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+                .truncationMode(.middle)
+
+            Spacer()
+
+            if isURL, let url = URL(string: payload) {
+                Link(destination: url) {
+                    Image(systemName: "safari")
+                        .font(.caption)
+                        .foregroundStyle(Color.appAccent)
+                }
+            } else {
+                Button {
+                    UIPasteboard.general.string = payload
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                        .font(.caption)
+                        .foregroundStyle(Color.appAccent)
+                }
+                .buttonStyle(.plain)
             }
         }
     }

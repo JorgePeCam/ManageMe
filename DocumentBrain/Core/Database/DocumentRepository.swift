@@ -123,6 +123,17 @@ struct DocumentRepository {
         }
     }
 
+    func saveBarcodes(_ barcodes: [String], forDocumentId id: String) async throws {
+        let json = try JSONEncoder().encode(barcodes)
+        guard let jsonString = String(data: json, encoding: .utf8) else { return }
+        try await db.dbWriter.write { db in
+            try db.execute(
+                sql: "UPDATE document SET barcodes = ? WHERE id = ?",
+                arguments: [jsonString, id]
+            )
+        }
+    }
+
     // MARK: - Thumbnail
 
     func updateThumbnail(documentId: String, thumbnailURL: String) async throws {

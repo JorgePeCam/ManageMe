@@ -41,20 +41,30 @@ actor DocumentProcessor {
         await process(documentId: documentId)
     }
 
-    /// Background sweep: extracts metadata for all ready documents that don't have it yet.
+    /// Background sweep: extracts metadata and detects barcodes for ready documents that lack them.
     func extractMissingMetadata() async {
         guard let docs = try? await documentRepo.fetchAll() else { return }
-        let missing = docs.filter {
-            $0.processingStatusEnum == .ready &&
-            $0.structuredData == nil &&
-            !$0.content.isEmpty
+        let ready = docs.filter { $0.processingStatusEnum == .ready }
+
+        // Metadata sweep
+        let missingMeta = ready.filter { $0.structuredData == nil && !$0.content.isEmpty }
+        if !missingMeta.isEmpty {
+            AppLogger.debug("[Processor] Auto-metadata sweep: \(missingMeta.count) document(s) pending")
+            for doc in missingMeta {
+                await extractMetadata(documentId: doc.id, text: doc.content, title: doc.title)
+                try? await Task.sleep(nanoseconds: 500_000_000)
+            }
         }
-        guard !missing.isEmpty else { return }
-        AppLogger.debug("[Processor] Auto-metadata sweep: \(missing.count) document(s) pending")
-        for doc in missing {
-            await extractMetadata(documentId: doc.id, text: doc.content, title: doc.title)
-            // Brief pause between calls to avoid hammering the worker
-            try? await Task.sleep(nanoseconds: 500_000_000)
+
+        // Barcode sweep
+        let missingBarcodes = ready.filter { $0.barcodes == nil && $0.absoluteFileURL != nil }
+        if !missingBarcodes.isEmpty {
+            AppLogger.debug("[Processor] Auto-barcode sweep: \(missingBarcodes.count) document(s) pending")
+            for doc in missingBarcodes {
+                if let url = doc.absoluteFileURL {
+                    await detectAndSaveBarcodes(documentId: doc.id, fileURL: url, fileType: doc.fileTypeEnum)
+                }
+            }
         }
     }
 
@@ -123,7 +133,14 @@ actor DocumentProcessor {
         try await chunkRepo.saveChunks(chunksWithEmbeddings)
         try await documentRepo.updateStatus(id: documentId, status: .ready)
 
-        // 5. Extract structured metadata (optional — never fails the pipeline)
+        // 5. Detect barcodes (optional — never fails the pipeline)
+        if let fileURL = document.absoluteFileURL {
+            Task {
+                await detectAndSaveBarcodes(documentId: documentId, fileURL: fileURL, fileType: document.fileTypeEnum)
+            }
+        }
+
+        // 6. Extract structured metadata (optional — never fails the pipeline)
         Task {
             await extractMetadata(documentId: documentId, text: extractedText, title: document.title)
         }
@@ -134,6 +151,17 @@ actor DocumentProcessor {
     }
 
     // MARK: - Metadata extraction (also callable from UI for manual re-extraction)
+
+    func detectAndSaveBarcodes(documentId: String, fileURL: URL, fileType: FileType) async {
+        let barcodes = await textExtractor.detectBarcodes(from: fileURL, fileType: fileType)
+        guard !barcodes.isEmpty else { return }
+        do {
+            try await documentRepo.saveBarcodes(barcodes, forDocumentId: documentId)
+            AppLogger.debug("[Processor] Barcodes saved for \(documentId): \(barcodes.count) code(s)")
+        } catch {
+            AppLogger.error("[Processor] Error saving barcodes: \(error.localizedDescription)")
+        }
+    }
 
     func extractMetadata(documentId: String, text: String, title: String) async {
         guard let metadata = await metadataExtractor.extract(from: text, documentTitle: title) else {
