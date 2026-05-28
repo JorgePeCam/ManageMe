@@ -6,6 +6,8 @@ final class DocumentDetailViewModel: ObservableObject {
     @Published var document: Document?
     @Published var previewURL: URL?
     @Published var isExtractingMetadata = false
+    /// `true` after a manual extraction attempt that returned no structured data.
+    @Published var metadataNotFound = false
 
     private let repository = DocumentRepository()
     private var documentId: String?
@@ -23,6 +25,7 @@ final class DocumentDetailViewModel: ObservableObject {
     func extractMetadata() {
         guard let document, document.isReady, !document.content.isEmpty else { return }
         isExtractingMetadata = true
+        metadataNotFound = false
         Task {
             await DocumentProcessor.shared.extractMetadata(
                 documentId: document.id,
@@ -33,6 +36,10 @@ final class DocumentDetailViewModel: ObservableObject {
                 await load(documentId: id)
             }
             isExtractingMetadata = false
+            // If still no metadata after extraction, surface a "not found" hint
+            if self.document?.structuredDataDecoded == nil {
+                metadataNotFound = true
+            }
         }
     }
 

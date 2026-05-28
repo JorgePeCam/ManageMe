@@ -297,33 +297,43 @@ struct DocumentDetailView: View {
     }
 
     private var extractMetadataButton: some View {
-        Button {
-            viewModel.extractMetadata()
-        } label: {
-            HStack(spacing: 8) {
-                if viewModel.isExtractingMetadata {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                        .tint(Color.appAccent)
-                    Text("Analizando documento…")
-                } else {
-                    Image(systemName: "sparkles")
-                        .foregroundStyle(Color.appAccent)
-                    Text("Extraer datos estructurados")
-                        .fontWeight(.medium)
+        VStack(spacing: 6) {
+            Button {
+                viewModel.extractMetadata()
+            } label: {
+                HStack(spacing: 8) {
+                    if viewModel.isExtractingMetadata {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                            .tint(Color.appAccent)
+                        Text("Analizando documento…")
+                    } else {
+                        Image(systemName: "sparkles")
+                            .foregroundStyle(Color.appAccent)
+                        Text("Extraer datos estructurados")
+                            .fontWeight(.medium)
+                    }
                 }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(Color.appCard)
+                .clipShape(RoundedRectangle(cornerRadius: AppStyle.cornerRadius))
+                .overlay(
+                    RoundedRectangle(cornerRadius: AppStyle.cornerRadius)
+                        .stroke(Color.appAccent.opacity(0.2), lineWidth: 1)
+                )
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
-            .background(Color.appCard)
-            .clipShape(RoundedRectangle(cornerRadius: AppStyle.cornerRadius))
-            .overlay(
-                RoundedRectangle(cornerRadius: AppStyle.cornerRadius)
-                    .stroke(Color.appAccent.opacity(0.2), lineWidth: 1)
-            )
+            .buttonStyle(.plain)
+            .disabled(viewModel.isExtractingMetadata)
+
+            if viewModel.metadataNotFound {
+                Text("No se encontraron datos estructurados en este documento")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            }
         }
-        .buttonStyle(.plain)
-        .disabled(viewModel.isExtractingMetadata)
     }
 
     // MARK: - Extracted Text

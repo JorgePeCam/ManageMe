@@ -82,7 +82,7 @@ struct MetadataExtractionService {
             "systemInstruction": ["parts": [["text": "You are a JSON extraction API. You MUST respond with ONLY a valid JSON object. No explanations, no markdown, no prose. Only JSON."]]],
             "contents": [["role": "user", "parts": [["text": prompt]]]],
             "generationConfig": [
-                "maxOutputTokens": 300,
+                "maxOutputTokens": 1024,
                 "temperature": 0.0
             ]
         ]
@@ -91,7 +91,12 @@ struct MetadataExtractionService {
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
-        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+        guard let http = response as? HTTPURLResponse else {
+            throw MetadataError.httpError
+        }
+        guard http.statusCode == 200 else {
+            let body = String(data: data, encoding: .utf8) ?? "(no body)"
+            AppLogger.debug("[Metadata] HTTP \(http.statusCode): \(body.prefix(300))")
             throw MetadataError.httpError
         }
 
@@ -110,8 +115,13 @@ struct MetadataExtractionService {
     // MARK: - JSON parsing
 
     private func parseJSON(from raw: String) -> StructuredDocumentData? {
-        // Strip optional markdown code fences
-        let cleaned = stripCodeFences(raw)
+        // Try several extraction strategies in order of precision
+        let cleaned: String
+        if let extracted = extractJSONObject(raw) {
+            cleaned = extracted
+        } else {
+            cleaned = stripCodeFences(raw)
+        }
 
         guard let data = cleaned.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
@@ -150,11 +160,27 @@ struct MetadataExtractionService {
         return result.isEmpty ? nil : result
     }
 
+    /// Finds the outermost `{…}` block within any surrounding prose or code fences.
+    /// Does NOT pre-validate — the caller's JSONSerialization call handles that.
+    private func extractJSONObject(_ text: String) -> String? {
+        guard let start = text.firstIndex(of: "{"),
+              let end = text.lastIndex(of: "}"),
+              start <= end else { return nil }
+        return String(text[start...end])
+    }
+
     private func stripCodeFences(_ text: String) -> String {
         var s = text
-        if s.hasPrefix("```json") { s = String(s.dropFirst(7)) }
-        else if s.hasPrefix("```") { s = String(s.dropFirst(3)) }
-        if s.hasSuffix("```") { s = String(s.dropLast(3)) }
+        // Handle optional newline after opening fence
+        for prefix in ["```json\n", "```JSON\n", "```\n", "```json", "```JSON", "```"] {
+            if s.hasPrefix(prefix) {
+                s = String(s.dropFirst(prefix.count))
+                break
+            }
+        }
+        // Handle optional newline before closing fence
+        if s.hasSuffix("\n```") { s = String(s.dropLast(4)) }
+        else if s.hasSuffix("```") { s = String(s.dropLast(3)) }
         return s.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
