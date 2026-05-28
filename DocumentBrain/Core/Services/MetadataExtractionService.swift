@@ -24,32 +24,30 @@ struct MetadataExtractionService {
     // MARK: - Public API
 
     /// Returns `nil` if the document has no financial/structured content worth extracting.
-    /// Tries Apple Foundation Models (on-device, iOS 26+) first; falls back to Gemini via proxy.
+    /// Uses Gemini (cloud) when available for best quality; falls back to Apple Foundation
+    /// Models (on-device, iOS 26+) when there is no network or proxy is not configured.
     func extract(from text: String, documentTitle: String) async -> StructuredDocumentData? {
-        // 1. On-device extraction (iOS 26+, no network required)
-        if #available(iOS 26, *) {
-            let extractor = FoundationModelMetadataExtractor()
-            if extractor.isAvailable {
-                AppLogger.debug("[Metadata] Using Foundation Models (on-device)")
-                if let result = await extractor.extract(from: text, documentTitle: documentTitle) {
-                    return result
-                }
-                // nil means either no structured data or the model failed — fall through to Gemini
+        // 1. Gemini via Cloudflare proxy (best quality)
+        if !Self.workerURL.isEmpty {
+            let prompt = buildPrompt(text: text, title: documentTitle)
+            do {
+                let raw = try await callWorker(prompt: prompt)
+                return parseJSON(from: raw)
+            } catch {
+                AppLogger.debug("[Metadata] Gemini extraction failed: \(error.localizedDescription) — trying on-device fallback")
             }
         }
 
-        // 2. Gemini via Cloudflare proxy
-        guard !Self.workerURL.isEmpty else { return nil }
-
-        let prompt = buildPrompt(text: text, title: documentTitle)
-
-        do {
-            let raw = try await callWorker(prompt: prompt)
-            return parseJSON(from: raw)
-        } catch {
-            AppLogger.debug("[Metadata] Extraction failed: \(error.localizedDescription)")
-            return nil
+        // 2. On-device fallback (iOS 26+, no network required)
+        if #available(iOS 26, *) {
+            let extractor = FoundationModelMetadataExtractor()
+            if extractor.isAvailable {
+                AppLogger.debug("[Metadata] Using Foundation Models (on-device fallback)")
+                return await extractor.extract(from: text, documentTitle: documentTitle)
+            }
         }
+
+        return nil
     }
 
     // MARK: - Prompt
