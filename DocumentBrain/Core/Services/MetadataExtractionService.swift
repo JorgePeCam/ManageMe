@@ -43,35 +43,35 @@ struct MetadataExtractionService {
     private func buildPrompt(text: String, title: String) -> String {
         let truncated = String(text.prefix(3000))
         return """
-        Analiza el siguiente documento y extrae datos estructurados si es relevante (factura, recibo, contrato, nómina, ticket, presupuesto, extracto bancario, billete de avión/tren, entrada de concierto/evento u otro documento con datos concretos).
+        Analiza el siguiente documento y extrae datos estructurados. Puede ser una factura, recibo, contrato, nómina, extracto bancario, presupuesto, tarjeta de embarque (boarding pass), billete de tren/autobús, entrada de concierto/evento, ticket u otro documento con datos concretos.
 
-        Si el documento NO contiene datos estructurados relevantes (es un artículo de opinión, un libro, una nota sin datos concretos, etc.), responde con:
+        Si el documento NO contiene datos estructurados relevantes (artículo de opinión, libro, nota sin datos concretos, etc.), responde con:
         {"isEmpty": true}
 
-        Si SÍ tiene datos estructurados, responde ÚNICAMENTE con JSON válido sin texto adicional ni bloques de código.
+        Si SÍ tiene datos estructurados, responde ÚNICAMENTE con JSON válido, sin texto adicional ni bloques de código.
 
-        Campos obligatorios (usa null si no aparece el dato):
+        REGLAS DE CLASIFICACIÓN:
+        - Tarjeta de embarque / boarding pass → documentType: "vuelo"
+        - Billete de tren o autobús → documentType: "vuelo" (usa flightNumber para el número de tren/bus)
+        - Entrada de concierto, teatro, festival → documentType: "evento"
+        - Factura, recibo con total a pagar → documentType: "factura" o "recibo"
+
+        JSON a devolver (omite un campo si genuinamente no aparece en el documento — NO uses null):
         {
           "documentType": "factura|recibo|contrato|nómina|extracto|ticket|presupuesto|vuelo|evento|otro",
-          "vendor": "nombre del emisor, aerolínea, organizador o comercio",
+          "vendor": "aerolínea, empresa de tren, organizador, comercio o emisor",
           "date": "YYYY-MM-DD",
-          "amount": número decimal sin símbolo (null si no aplica),
+          "amount": <número decimal sin símbolo, omitir si no hay precio>,
           "currency": "EUR|USD|GBP|etc",
-          "category": "alimentación|transporte|salud|educación|entretenimiento|hogar|trabajo|finanzas|compras|suministros|viajes|otro"
+          "category": "alimentación|transporte|salud|educación|entretenimiento|hogar|trabajo|finanzas|compras|suministros|viajes|otro",
+          "origin": "ciudad o código IATA/estación de origen (si aplica)",
+          "destination": "ciudad o código IATA/estación de destino (si aplica)",
+          "flightNumber": "número de vuelo, tren o servicio (ej: FR347, AVE 02154)",
+          "departureTime": "HH:MM hora de salida o inicio del evento",
+          "arrivalTime": "HH:MM hora de llegada (si aplica)",
+          "seat": "asiento, plaza o fila/butaca asignada",
+          "eventTitle": "nombre del concierto, espectáculo o evento"
         }
-
-        Campos adicionales para vuelos, trenes y transportes (incluye solo si aplica, omite el campo si no):
-          "origin": "ciudad o código de aeropuerto/estación de origen",
-          "destination": "ciudad o código de aeropuerto/estación de destino",
-          "flightNumber": "número de vuelo o tren (ej: IB6250, AVE 02154)",
-          "departureTime": "HH:MM hora de salida",
-          "arrivalTime": "HH:MM hora de llegada",
-          "seat": "asiento o plaza asignada"
-
-        Campos adicionales para eventos, conciertos y entradas (incluye solo si aplica):
-          "eventTitle": "nombre del evento, concierto o espectáculo",
-          "departureTime": "HH:MM hora del evento",
-          "seat": "fila y butaca asignada"
 
         Título del documento: \(title)
 
