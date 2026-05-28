@@ -526,31 +526,58 @@ struct MarkdownRenderer: View {
     }
 
     private func inline(_ text: String) -> AttributedString {
-        (try? AttributedString(
-            markdown: linkify(text),
+        let processed = shortenLinkDisplayTexts(linkify(text))
+        return (try? AttributedString(
+            markdown: processed,
             options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
         )) ?? AttributedString(text)
     }
 
-    /// Wraps bare URLs in markdown `[url](url)` so AttributedString renders them as tappable links.
+    /// Wraps bare URLs in `[domain](url)` so AttributedString renders them as tappable links.
+    /// Skips URLs already inside existing markdown `[text](url)` links.
     private func linkify(_ text: String) -> String {
+        // Find ranges already covered by markdown link syntax — don't double-wrap them
+        var protectedRanges = [Range<String.Index>]()
+        if let regex = try? NSRegularExpression(pattern: #"\[[^\[\]]*\]\(https?://[^)]+\)"#) {
+            for m in regex.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
+                if let r = Range(m.range, in: text) { protectedRanges.append(r) }
+            }
+        }
+
         guard let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) else {
             return text
         }
-        let ns = text as NSString
-        let matches = detector.matches(in: text, range: NSRange(location: 0, length: ns.length))
+
+        let urlMatches = detector.matches(in: text, range: NSRange(text.startIndex..., in: text))
         var result = text
-        // Reverse order so replacements don't shift subsequent ranges
-        for match in matches.reversed() {
-            guard let range = Range(match.range, in: result) else { continue }
-            let raw = String(result[range])
-            // Skip if already inside a markdown link [...](...) — check char before
-            if range.lowerBound > result.startIndex {
-                let before = result[result.index(before: range.lowerBound)]
-                if before == "(" { continue }
-            }
-            let urlString = match.url?.absoluteString ?? raw
-            result.replaceSubrange(range, with: "[\(raw)](\(urlString))")
+
+        // Reverse so replacements don't shift earlier positions
+        for match in urlMatches.reversed() {
+            guard let originalRange = Range(match.range, in: text),
+                  let resultRange   = Range(match.range, in: result) else { continue }
+            if protectedRanges.contains(where: { $0.overlaps(originalRange) }) { continue }
+            let urlString   = match.url?.absoluteString ?? String(result[resultRange])
+            let displayText = match.url?.host ?? String(result[resultRange])
+            result.replaceSubrange(resultRange, with: "[\(displayText)](\(urlString))")
+        }
+        return result
+    }
+
+    /// Replaces `[https://full-url](url)` with `[domain](url)` for readability
+    /// when the LLM already produced markdown links with the raw URL as display text.
+    private func shortenLinkDisplayTexts(_ text: String) -> String {
+        guard let regex = try? NSRegularExpression(
+            pattern: #"\[(https?://[^\]]+)\]\((https?://[^)]+)\)"#
+        ) else { return text }
+
+        var result = text
+        while let match = regex.firstMatch(in: result, range: NSRange(result.startIndex..., in: result)) {
+            guard let fullRange = Range(match.range, in: result),
+                  let hrefRange = Range(match.range(at: 2), in: result),
+                  let url = URL(string: String(result[hrefRange])) else { break }
+            let domain = url.host ?? String(result[hrefRange])
+            let href   = String(result[hrefRange])
+            result.replaceSubrange(fullRange, with: "[\(domain)](\(href))")
         }
         return result
     }
